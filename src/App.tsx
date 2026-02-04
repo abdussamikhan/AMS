@@ -86,7 +86,8 @@ function App() {
     cause: '',
     effect: '',
     recommendation: '',
-    risk_rating: 'Low' as Database['public']['Enums']['risk_level']
+    risk_rating: 'Low' as Database['public']['Enums']['risk_level'],
+    title: ''
   })
   const [stats, setStats] = useState({
     total: 0,
@@ -167,6 +168,7 @@ function App() {
       if (data) {
         setNewObs(prev => ({
           ...prev,
+          title: data.title || prev.title,
           condition: data.condition || prev.condition,
           criteria: data.criteria || prev.criteria,
           cause: data.cause || prev.cause,
@@ -1012,11 +1014,16 @@ function App() {
                         {getRatingBadge(obs.risk_rating)}
                       </div>
                       <div className="obs-info">
-                        <h3>{obs.condition}</h3>
+                        <h3>{obs.title || obs.condition}</h3>
                         <div className="obs-meta">
                           <span>{obs.audit_procedures?.framework_mapping?.framework_name} / {obs.audit_procedures?.framework_mapping?.reference_code}</span>
                           <span>•</span>
                           <span>{obs.audit_procedures?.framework_mapping?.risk_categories?.category_name}</span>
+                          <span>•</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <Clock size={12} />
+                            {new Date(obs.created_at).toLocaleDateString()}
+                          </span>
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -1055,7 +1062,7 @@ function App() {
                     {selectedObs.audit_procedures?.framework_mapping?.framework_name} • {selectedObs.audit_procedures?.framework_mapping?.reference_code}
                   </span>
                 </div>
-                <h2 style={{ fontSize: '1.5rem', lineHeight: '1.3' }}>{selectedObs.condition}</h2>
+                <h2 style={{ fontSize: '1.5rem', lineHeight: '1.3' }}>{selectedObs.title || selectedObs.condition}</h2>
               </div>
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                 <button
@@ -1085,6 +1092,10 @@ function App() {
 
             <div className="modal-body">
               <div className="detail-grid">
+                <div className="detail-item" style={{ gridColumn: 'span 2' }}>
+                  <div className="detail-label">Condition (Finding Detail)</div>
+                  <div className="detail-value" style={{ fontSize: '1.1rem' }}>{selectedObs.condition}</div>
+                </div>
                 <div className="detail-item">
                   <div className="detail-label">Criteria</div>
                   <div className="detail-value">{selectedObs.criteria}</div>
@@ -1328,7 +1339,8 @@ function App() {
                     cause: '',
                     effect: '',
                     recommendation: '',
-                    risk_rating: 'Low'
+                    risk_rating: 'Low' as any,
+                    title: ''
                   })
                   fetchData()
                 } else {
@@ -1353,6 +1365,17 @@ function App() {
                 </div>
 
                 <div className="detail-item">
+                  <label className="detail-label">Title (Summary)</label>
+                  <input
+                    required
+                    className="form-control"
+                    placeholder="Summarized finding title..."
+                    value={newObs.title}
+                    onChange={e => setNewObs({ ...newObs, title: e.target.value })}
+                  />
+                </div>
+
+                <div className="detail-item">
                   <label className="detail-label">Condition (Finding)</label>
                   <textarea
                     required
@@ -1368,35 +1391,37 @@ function App() {
                   <textarea
                     required
                     className="form-control"
+                    style={{ minHeight: '80px' }}
                     placeholder="What is the required standard?"
                     value={newObs.criteria}
                     onChange={e => setNewObs({ ...newObs, criteria: e.target.value })}
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="detail-item">
-                    <label className="detail-label">Risk Rating</label>
-                    <select
-                      className="form-control"
-                      value={newObs.risk_rating}
-                      onChange={e => setNewObs({ ...newObs, risk_rating: e.target.value as any })}
-                    >
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                      <option value="Critical">Critical</option>
-                    </select>
-                  </div>
-                  <div className="detail-item">
-                    <label className="detail-label">Cause</label>
-                    <input
-                      className="form-control"
-                      placeholder="Root cause..."
-                      value={newObs.cause}
-                      onChange={e => setNewObs({ ...newObs, cause: e.target.value })}
-                    />
-                  </div>
+                <div className="detail-item">
+                  <label className="detail-label">Cause (Root Cause)</label>
+                  <textarea
+                    required
+                    className="form-control"
+                    style={{ minHeight: '80px' }}
+                    placeholder="Root cause..."
+                    value={newObs.cause}
+                    onChange={e => setNewObs({ ...newObs, cause: e.target.value })}
+                  />
+                </div>
+
+                <div className="detail-item">
+                  <label className="detail-label">Risk Rating</label>
+                  <select
+                    className="form-control"
+                    value={newObs.risk_rating}
+                    onChange={e => setNewObs({ ...newObs, risk_rating: e.target.value as any })}
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Critical">Critical</option>
+                  </select>
                 </div>
 
                 <div className="detail-item">
