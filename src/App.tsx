@@ -379,23 +379,25 @@ function App() {
       obs.title || obs.condition.substring(0, 40) + '...',
       obs.condition.substring(0, 80) + (obs.condition.length > 80 ? '...' : ''),
       obs.risk_rating,
-      obs.management_responses?.[0]?.status || 'Open'
+      obs.management_responses?.[0]?.status || 'Open',
+      new Date(obs.created_at).toLocaleDateString()
     ])
 
     autoTable(doc, {
       startY: 85,
-      head: [['#', 'Reference', 'Title', 'Finding (Condition)', 'Risk', 'Status']],
+      head: [['#', 'Reference', 'Title', 'Finding (Condition)', 'Risk', 'Status', 'Created']],
       body: tableRows,
       theme: 'grid',
       headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
       styles: { fontSize: 8, cellPadding: 3 },
       columnStyles: {
         0: { cellWidth: 10 },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 55 },
-        3: { cellWidth: 100 },
-        4: { cellWidth: 20 },
-        5: { cellWidth: 20 }
+        1: { cellWidth: 38 },
+        2: { cellWidth: 50 },
+        3: { cellWidth: 90 },
+        4: { cellWidth: 18 },
+        5: { cellWidth: 18 },
+        6: { cellWidth: 22 }
       },
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index === 4) {
