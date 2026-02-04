@@ -27,7 +27,9 @@ import {
   FileText,
   ExternalLink,
   Bell,
-  Clock
+  Clock,
+  Sparkles,
+  Wand2
 } from 'lucide-react'
 import {
   BarChart,
@@ -95,6 +97,10 @@ function App() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
 
+  // AI State
+  const [aiInput, setAiInput] = useState('')
+  const [isAIProcessing, setIsAIProcessing] = useState(false)
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
@@ -145,6 +151,37 @@ function App() {
       alert(err.message)
     } finally {
       setIsAuthLoading(false)
+    }
+  }
+
+  const processWithAI = async () => {
+    if (!aiInput.trim()) return
+    setIsAIProcessing(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('process-audit-finding', {
+        body: { rawText: aiInput }
+      })
+
+      if (error) throw error
+
+      if (data) {
+        setNewObs(prev => ({
+          ...prev,
+          condition: data.condition || prev.condition,
+          criteria: data.criteria || prev.criteria,
+          cause: data.cause || prev.cause,
+          effect: data.effect || prev.effect,
+          recommendation: data.recommendation || prev.recommendation,
+          risk_rating: (['Low', 'Medium', 'High', 'Critical'].includes(data.risk_rating) ? data.risk_rating : 'Low') as any
+        }))
+        setAiInput('')
+        alert('AI has successfully structured your finding!')
+      }
+    } catch (err: any) {
+      console.error('AI Error:', err)
+      alert('AI Assistant is currently unavailable. Please fill in the details manually.')
+    } finally {
+      setIsAIProcessing(false)
     }
   }
 
@@ -1228,155 +1265,203 @@ function App() {
                 <X size={24} />
               </button>
             </div>
-            <form className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }} onSubmit={async (e) => {
-              e.preventDefault()
-              const { error } = await supabase.from('audit_observations').insert([{
-                ...newObs,
-                evidence_urls: uploadedFiles
-              }])
-              if (!error) {
-                setShowNewModal(false)
-                setUploadedFiles([])
-                setNewObs({
-                  procedure_id: '',
-                  condition: '',
-                  criteria: '',
-                  cause: '',
-                  effect: '',
-                  recommendation: '',
-                  risk_rating: 'Low'
-                })
-                fetchData()
-              } else {
-                alert('Error saving observation: ' + error.message)
-              }
-            }}>
-              <div className="detail-item">
-                <label className="detail-label">Audit Procedure</label>
-                <select
-                  required
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* AI Assistant Section */}
+              <div style={{
+                background: 'rgba(59, 130, 246, 0.1)',
+                border: '1px solid var(--accent-blue)',
+                borderRadius: '0.75rem',
+                padding: '1rem',
+                marginBottom: '0.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: 'var(--accent-blue)' }}>
+                  <Wand2 size={18} />
+                  <span style={{ fontWeight: '700', fontSize: '0.875rem', textTransform: 'uppercase' }}>AI Audit Assistant</span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                  Paste your raw audit notes or observation text below, and let AI structure the finding for you.
+                </p>
+                <textarea
                   className="form-control"
-                  value={newObs.procedure_id}
-                  onChange={e => setNewObs({ ...newObs, procedure_id: e.target.value })}
+                  style={{ minHeight: '80px', marginBottom: '1rem', background: 'rgba(0,0,0,0.2)' }}
+                  placeholder="e.g., During the review of backup logs for Q3, we noticed that 5 servers didn't have backup records. This violates the IT Policy SEC-04. The admin forgot to include them in the new schedule..."
+                  value={aiInput}
+                  onChange={e => setAiInput(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={processWithAI}
+                  disabled={isAIProcessing || !aiInput.trim()}
+                  style={{
+                    width: '100%',
+                    background: 'var(--accent-blue)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '0.6rem',
+                    borderRadius: '0.5rem',
+                    cursor: (isAIProcessing || !aiInput.trim()) ? 'not-allowed' : 'pointer',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}
                 >
-                  <option value="">Select a procedure...</option>
-                  {procedures.map(p => (
-                    <option key={p.procedure_id} value={p.procedure_id}>
-                      {p.framework_mapping?.framework_name} {p.framework_mapping?.reference_code} - {p.procedure_name}
-                    </option>
-                  ))}
-                </select>
+                  {isAIProcessing ? 'AI is processing...' : <><Sparkles size={16} /> Structure with AI</>}
+                </button>
               </div>
 
-              <div className="detail-item">
-                <label className="detail-label">Condition (Finding)</label>
-                <textarea
-                  required
-                  className="form-control"
-                  placeholder="What was found?"
-                  value={newObs.condition}
-                  onChange={e => setNewObs({ ...newObs, condition: e.target.value })}
-                />
-              </div>
-
-              <div className="detail-item">
-                <label className="detail-label">Criteria (Standard)</label>
-                <textarea
-                  required
-                  className="form-control"
-                  placeholder="What is the required standard?"
-                  value={newObs.criteria}
-                  onChange={e => setNewObs({ ...newObs, criteria: e.target.value })}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <form style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }} onSubmit={async (e) => {
+                e.preventDefault()
+                const { error } = await supabase.from('audit_observations').insert([{
+                  ...newObs,
+                  evidence_urls: uploadedFiles
+                }])
+                if (!error) {
+                  setShowNewModal(false)
+                  setUploadedFiles([])
+                  setNewObs({
+                    procedure_id: '',
+                    condition: '',
+                    criteria: '',
+                    cause: '',
+                    effect: '',
+                    recommendation: '',
+                    risk_rating: 'Low'
+                  })
+                  fetchData()
+                } else {
+                  alert('Error saving observation: ' + error.message)
+                }
+              }}>
                 <div className="detail-item">
-                  <label className="detail-label">Risk Rating</label>
+                  <label className="detail-label">Audit Procedure</label>
                   <select
+                    required
                     className="form-control"
-                    value={newObs.risk_rating}
-                    onChange={e => setNewObs({ ...newObs, risk_rating: e.target.value as any })}
+                    value={newObs.procedure_id}
+                    onChange={e => setNewObs({ ...newObs, procedure_id: e.target.value })}
                   >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                    <option value="Critical">Critical</option>
+                    <option value="">Select a procedure...</option>
+                    {procedures.map(p => (
+                      <option key={p.procedure_id} value={p.procedure_id}>
+                        {p.framework_mapping?.framework_name} {p.framework_mapping?.reference_code} - {p.procedure_name}
+                      </option>
+                    ))}
                   </select>
                 </div>
+
                 <div className="detail-item">
-                  <label className="detail-label">Cause</label>
-                  <input
+                  <label className="detail-label">Condition (Finding)</label>
+                  <textarea
+                    required
                     className="form-control"
-                    placeholder="Root cause..."
-                    value={newObs.cause}
-                    onChange={e => setNewObs({ ...newObs, cause: e.target.value })}
+                    placeholder="What was found?"
+                    value={newObs.condition}
+                    onChange={e => setNewObs({ ...newObs, condition: e.target.value })}
                   />
                 </div>
-              </div>
 
-              <div className="detail-item">
-                <label className="detail-label">Recommendation</label>
-                <textarea
-                  className="form-control"
-                  placeholder="Suggested action plan..."
-                  value={newObs.recommendation}
-                  onChange={e => setNewObs({ ...newObs, recommendation: e.target.value })}
-                />
-              </div>
-
-              <div className="detail-item">
-                <label className="detail-label">Attachments (Evidence)</label>
-                <div style={{
-                  border: '2px dashed var(--border-color)',
-                  borderRadius: '0.75rem',
-                  padding: '1.5rem',
-                  textAlign: 'center',
-                  background: 'var(--glass-bg)',
-                  cursor: 'pointer',
-                  position: 'relative',
-                  transition: 'border-color 0.2s'
-                }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-blue)'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
-                >
-                  <input
-                    type="file"
-                    multiple
-                    onChange={handleFileUpload}
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                <div className="detail-item">
+                  <label className="detail-label">Criteria (Standard)</label>
+                  <textarea
+                    required
+                    className="form-control"
+                    placeholder="What is the required standard?"
+                    value={newObs.criteria}
+                    onChange={e => setNewObs({ ...newObs, criteria: e.target.value })}
                   />
-                  <Upload color="var(--text-secondary)" size={24} style={{ marginBottom: '0.5rem' }} />
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                    {isUploading ? 'Uploading to Supabase...' : 'Click or Drag files to upload proof'}
-                  </p>
                 </div>
-                {uploadedFiles.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1rem', padding: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '0.5rem' }}>
-                    <CheckCircle size={16} color="var(--success)" />
-                    <span style={{ fontSize: '0.75rem', color: '#fff' }}>{uploadedFiles.length} files successfully attached</span>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="detail-item">
+                    <label className="detail-label">Risk Rating</label>
+                    <select
+                      className="form-control"
+                      value={newObs.risk_rating}
+                      onChange={e => setNewObs({ ...newObs, risk_rating: e.target.value as any })}
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Critical">Critical</option>
+                    </select>
                   </div>
-                )}
-              </div>
+                  <div className="detail-item">
+                    <label className="detail-label">Cause</label>
+                    <input
+                      className="form-control"
+                      placeholder="Root cause..."
+                      value={newObs.cause}
+                      onChange={e => setNewObs({ ...newObs, cause: e.target.value })}
+                    />
+                  </div>
+                </div>
 
-              <button
-                type="submit"
-                disabled={isUploading}
-                style={{
-                  background: isUploading ? 'var(--border-color)' : 'var(--accent-blue)',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '1rem',
-                  borderRadius: '0.5rem',
-                  cursor: isUploading ? 'not-allowed' : 'pointer',
-                  fontWeight: '700',
-                  marginTop: '1rem',
-                  transition: 'opacity 0.2s'
-                }}
-              >
-                {isUploading ? 'Finalizing Uploads...' : 'Save Observation'}
-              </button>
-            </form>
+                <div className="detail-item">
+                  <label className="detail-label">Recommendation</label>
+                  <textarea
+                    className="form-control"
+                    placeholder="Suggested action plan..."
+                    value={newObs.recommendation}
+                    onChange={e => setNewObs({ ...newObs, recommendation: e.target.value })}
+                  />
+                </div>
+
+                <div className="detail-item">
+                  <label className="detail-label">Attachments (Evidence)</label>
+                  <div style={{
+                    border: '2px dashed var(--border-color)',
+                    borderRadius: '0.75rem',
+                    padding: '1.5rem',
+                    textAlign: 'center',
+                    background: 'var(--glass-bg)',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    transition: 'border-color 0.2s'
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-blue)'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
+                  >
+                    <input
+                      type="file"
+                      multiple
+                      onChange={handleFileUpload}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                    />
+                    <Upload color="var(--text-secondary)" size={24} style={{ marginBottom: '0.5rem' }} />
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                      {isUploading ? 'Uploading to Supabase...' : 'Click or Drag files to upload proof'}
+                    </p>
+                  </div>
+                  {uploadedFiles.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1rem', padding: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '0.5rem' }}>
+                      <CheckCircle size={16} color="var(--success)" />
+                      <span style={{ fontSize: '0.75rem', color: '#fff' }}>{uploadedFiles.length} files successfully attached</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isUploading}
+                  style={{
+                    background: isUploading ? 'var(--border-color)' : 'var(--accent-blue)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '1rem',
+                    borderRadius: '0.5rem',
+                    cursor: isUploading ? 'not-allowed' : 'pointer',
+                    fontWeight: '700',
+                    marginTop: '1rem',
+                    transition: 'opacity 0.2s'
+                  }}
+                >
+                  {isUploading ? 'Finalizing Uploads...' : 'Save Observation'}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
