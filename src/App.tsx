@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import type { Database } from './types/supabase'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import {
   LayoutDashboard,
   ShieldAlert,
@@ -9,15 +11,23 @@ import {
   Search,
   ChevronRight,
   ClipboardList,
-  X,
-  Target,
-  User,
-  Calendar,
   Plus,
   Download,
   Activity,
   Send,
-  CheckCircle
+  CheckCircle,
+  LogOut,
+  Mail,
+  Lock,
+  User as UserIcon,
+  X,
+  Target,
+  Calendar,
+  Upload,
+  FileText,
+  ExternalLink,
+  Bell,
+  Clock
 } from 'lucide-react'
 import {
   BarChart,
@@ -27,9 +37,11 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
   Legend
 } from 'recharts'
+
+type Profile = Database['public']['Tables']['profiles']['Row']
+type Notification = Database['public']['Tables']['notifications']['Row']
 
 type Observation = Database['public']['Tables']['audit_observations']['Row'] & {
   audit_procedures: {
@@ -43,12 +55,24 @@ type Observation = Database['public']['Tables']['audit_observations']['Row'] & {
     }
   }
   management_responses: Database['public']['Tables']['management_responses']['Row'][]
+  evidence_urls?: string[]
 }
 
 function App() {
-  const [loading, setLoading] = useState(true)
+  const [isAppLoading, setIsAppLoading] = useState(true)
+  const [isAuthLoading, setIsAuthLoading] = useState(false)
+  const [isDataLoading, setIsDataLoading] = useState(false)
+  const [session, setSession] = useState<any>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authFullName, setAuthFullName] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
+  const [selectedRole, setSelectedRole] = useState<'auditor' | 'manager' | 'client'>('manager')
   const [observations, setObservations] = useState<Observation[]>([])
-  const [activeView, setActiveView] = useState('overview') // 'overview' | 'findings'
+  const [activeView, setActiveView] = useState('overview')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedObs, setSelectedObs] = useState<Observation | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
@@ -68,6 +92,66 @@ function App() {
     high: 0,
     medium: 0
   })
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [showNotifications, setShowNotifications] = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      if (session) fetchProfile(session.user.id)
+      setIsAppLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      if (session) fetchProfile(session.user.id)
+      else setProfile(null)
+      setIsAppLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  async function fetchProfile(uid: string) {
+    const { data } = await supabase.from('profiles').select('*').eq('id', uid).single()
+    if (data) setProfile(data)
+  }
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsAuthLoading(true)
+    try {
+      if (authMode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password: authPassword
+        })
+        if (error) throw error
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email: authEmail,
+          password: authPassword,
+          options: {
+            data: {
+              role: selectedRole,
+              full_name: authFullName
+            }
+          }
+        })
+        if (error) throw error
+        alert('Confirmation email sent! Please check your inbox (and spam).')
+      }
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setIsAuthLoading(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setActiveView('overview')
+  }
 
   // Management response form state
   const [mgmtResp, setMgmtResp] = useState({
@@ -80,9 +164,48 @@ function App() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    fetchData()
-    fetchProcedures()
-  }, [])
+    if (session) {
+      fetchData()
+      fetchProcedures()
+      fetchNotifications()
+
+      const channel = supabase
+        .channel('realtime_notifications')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session.user.id}` },
+          (payload) => {
+            setNotifications(prev => [payload.new as Notification, ...prev])
+          }
+        )
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
+  }, [session])
+
+  async function fetchNotifications() {
+    if (!session) return
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false })
+    if (data) setNotifications(data)
+  }
+
+  async function markAsRead(id: string) {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', id)
+
+    if (!error) {
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+    }
+  }
 
   async function fetchProcedures() {
     const { data } = await supabase
@@ -100,7 +223,7 @@ function App() {
 
   async function fetchData() {
     try {
-      setLoading(true)
+      setIsDataLoading(true)
       const { data, error } = await supabase
         .from('audit_observations')
         .select(`
@@ -139,9 +262,10 @@ function App() {
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
-      setLoading(false)
+      setIsDataLoading(false)
     }
   }
+
 
   const filteredObservations = observations.filter(obs => {
     const searchLower = searchQuery.toLowerCase()
@@ -179,6 +303,181 @@ function App() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+  }
+
+  const generatePDF = () => {
+    const doc = new jsPDF()
+    const timestamp = new Date().toLocaleString()
+
+    // Title & Header
+    doc.setFontSize(22)
+    doc.setTextColor(41, 128, 185) // Professional Blue
+    doc.text('Audit Management System', 14, 22)
+    doc.setFontSize(14)
+    doc.setTextColor(100)
+    doc.text('Internal Audit Findings Report', 14, 30)
+
+    // Meta Info
+    doc.setFontSize(10)
+    doc.text(`Generated: ${timestamp}`, 14, 38)
+    doc.text(`User: ${profile?.full_name || session.user.email}`, 14, 43)
+
+    // Summary Box
+    doc.setDrawColor(200)
+    doc.setFillColor(245, 247, 250)
+    doc.rect(14, 50, 182, 25, 'F')
+    doc.setTextColor(0)
+    doc.setFontSize(11)
+    doc.text('SUMMARY STATISTICS', 20, 58)
+    doc.setFontSize(10)
+    doc.text(`Total Findings: ${stats.total}  |  Critical: ${stats.critical}  |  High: ${stats.high}  |  Medium: ${stats.medium}`, 20, 68)
+
+    // Findings Table
+    const tableRows = filteredObservations.map((obs, index) => [
+      index + 1,
+      `${obs.audit_procedures?.framework_mapping?.framework_name} / ${obs.audit_procedures?.framework_mapping?.reference_code}`,
+      obs.condition,
+      obs.risk_rating,
+      obs.management_responses?.[0]?.status || 'Open'
+    ])
+
+    autoTable(doc, {
+      startY: 85,
+      head: [['#', 'Reference', 'Finding (Condition)', 'Risk', 'Status']],
+      body: tableRows,
+      theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 9, cellPadding: 4 },
+      columnStyles: {
+        0: { cellWidth: 10 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 80 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 25 }
+      },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 3) {
+          const rating = data.cell.raw as string
+          if (rating === 'Critical') data.cell.styles.textColor = [239, 68, 68]
+          if (rating === 'High') data.cell.styles.textColor = [248, 113, 113]
+        }
+      }
+    })
+
+    // Footer
+    const pageCount = (doc as any).internal.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
+      doc.setFontSize(8)
+      doc.setTextColor(150)
+      doc.text(`Page ${i} of ${pageCount} - Confidential AMS Internal Report`, 14, 285)
+    }
+
+    doc.save(`AMS_Audit_Report_${new Date().toISOString().split('T')[0]}.pdf`)
+  }
+
+  const generateDetailedPDF = (obs: Observation) => {
+    const doc = new jsPDF()
+    const timestamp = new Date().toLocaleString()
+
+    // Title & Header
+    doc.setFontSize(22)
+    doc.setTextColor(41, 128, 185)
+    doc.text('AMS: Detailed Finding Report', 14, 22)
+
+    doc.setFontSize(10)
+    doc.setTextColor(100)
+    doc.text(`Generated: ${timestamp}`, 14, 30)
+    doc.text(`User: ${profile?.full_name || session.user.email}`, 14, 35)
+
+    // Finding Overview Box
+    doc.setDrawColor(41, 128, 185)
+    doc.setLineWidth(0.5)
+    doc.line(14, 40, 196, 40)
+
+    // Section 1: Overview
+    doc.setFontSize(14)
+    doc.setTextColor(0)
+    doc.setFont('helvetica', 'bold')
+    doc.text('1. OVERVIEW', 14, 50)
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Reference: ${obs.audit_procedures?.framework_mapping?.framework_name} / ${obs.audit_procedures?.framework_mapping?.reference_code}`, 14, 58)
+    doc.text(`Procedure: ${obs.audit_procedures?.procedure_name}`, 14, 63)
+    doc.text(`Category: ${obs.audit_procedures?.framework_mapping?.risk_categories?.category_name}`, 14, 68)
+
+    // Risk Badge
+    const rating = obs.risk_rating
+    doc.setFillColor(rating === 'Critical' ? 239 : rating === 'High' ? 248 : 251, rating === 'Critical' ? 68 : rating === 'High' ? 113 : 191, rating === 'Critical' ? 68 : rating === 'High' ? 113 : 36)
+    doc.rect(150, 50, 45, 10, 'F')
+    doc.setTextColor(255)
+    doc.setFont('helvetica', 'bold')
+    doc.text(`RISK: ${rating.toUpperCase()}`, 154, 56)
+
+    // Section 2: Finding Details
+    doc.setTextColor(41, 128, 185)
+    doc.setFontSize(14)
+    doc.text('2. FINDING DETAILS (5C MODEL)', 14, 85)
+
+    autoTable(doc, {
+      startY: 90,
+      body: [
+        ['CONDITION', obs.condition],
+        ['CRITERIA', obs.criteria],
+        ['CAUSE', obs.cause || 'Not specified'],
+        ['EFFECT', obs.effect || 'Not specified'],
+        ['RECOMMENDATION', obs.recommendation || 'Not specified']
+      ],
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 5 },
+      columnStyles: {
+        0: { cellWidth: 40, fontStyle: 'bold', fillColor: [245, 247, 250] },
+        1: { cellWidth: 142 }
+      }
+    })
+
+    // Section 3: Management Action Plan
+    const finalY = (doc as any).lastAutoTable.finalY + 15
+    doc.setFontSize(14)
+    doc.setTextColor(41, 128, 185)
+    doc.text('3. MANAGEMENT ACTION PLAN', 14, finalY)
+
+    if (obs.management_responses && obs.management_responses.length > 0) {
+      const resp = obs.management_responses[0]
+      autoTable(doc, {
+        startY: finalY + 5,
+        body: [
+          ['RESPONSE', resp.management_response],
+          ['ACTION PLAN', resp.action_plan],
+          ['RESPONSIBLE', resp.responsible_person],
+          ['TARGET DATE', resp.target_date],
+          ['STATUS', resp.status]
+        ],
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: 4 },
+        columnStyles: {
+          0: { cellWidth: 40, fontStyle: 'bold', textColor: [100, 100, 100] },
+          1: { cellWidth: 142 }
+        }
+      })
+    } else {
+      doc.setFontSize(10)
+      doc.setTextColor(150)
+      doc.setFont('helvetica', 'italic')
+      doc.text('Pending management response...', 14, finalY + 10)
+    }
+
+    // Footer
+    const pageCount = (doc as any).internal.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
+      doc.setFontSize(8)
+      doc.setTextColor(150)
+      doc.text(`Page ${i} of ${pageCount} - AMS Detailed Audit Report - ${obs.observation_id}`, 14, 285)
+    }
+
+    doc.save(`AMS_Detailed_Finding_${obs.observation_id.slice(0, 8)}.pdf`)
   }
 
   const handleMgmtSubmit = async (e: React.FormEvent) => {
@@ -230,9 +529,152 @@ function App() {
     return acc
   }, [])
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    setIsUploading(true)
+    const newUrls = [...uploadedFiles]
+
+    for (const file of Array.from(files)) {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random()}.${fileExt}`
+      const filePath = `${session.user.id}/${fileName}`
+
+      const { error } = await supabase.storage
+        .from('audit-evidence')
+        .upload(filePath, file)
+
+      if (error) {
+        alert('Error uploading file: ' + error.message)
+      } else {
+        const { data: { publicUrl } } = supabase.storage
+          .from('audit-evidence')
+          .getPublicUrl(filePath)
+        newUrls.push(publicUrl)
+      }
+    }
+
+    setUploadedFiles(newUrls)
+    setIsUploading(false)
+  }
+
   const getRatingBadge = (rating: string) => {
     const r = rating.toLowerCase()
     return <span className={`badge badge-${r}`}>{rating}</span>
+  }
+
+  if (isAppLoading) {
+    return (
+      <div className="auth-container">
+        <div style={{ textAlign: 'center' }}>
+          <div className="logo" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>AMS Dashboard</div>
+          <div style={{ color: 'var(--text-secondary)' }}>Initializing Secure Session...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return (
+      <div className="auth-container">
+        <div className="auth-card fade-in">
+          <div className="auth-header">
+            <div className="logo" style={{ marginBottom: '0.5rem' }}>AMS Dashboard</div>
+            <h2>{authMode === 'login' ? 'Welcome Back' : 'Create Account'}</h2>
+            <p style={{ color: 'var(--text-secondary)' }}>
+              {authMode === 'login' ? 'Enter your credentials to access the system' : 'Sign up to start managing audit findings'}
+            </p>
+          </div>
+          <form className="auth-form" onSubmit={handleAuth}>
+            {authMode === 'signup' && (
+              <>
+                <div className="detail-item">
+                  <label className="detail-label">Full Name / Display Name</label>
+                  <div style={{ position: 'relative' }}>
+                    <UserIcon size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                    <input
+                      type="text"
+                      className="form-control"
+                      style={{ paddingLeft: '40px' }}
+                      placeholder="John Doe"
+                      value={authFullName}
+                      onChange={e => setAuthFullName(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <label className="detail-label">I am an:</label>
+                  <div className="role-selector">
+                    <button
+                      type="button"
+                      className={`role-btn ${selectedRole === 'manager' ? 'active' : ''}`}
+                      onClick={() => setSelectedRole('manager')}
+                    >
+                      Manager
+                    </button>
+                    <button
+                      type="button"
+                      className={`role-btn ${selectedRole === 'auditor' ? 'active' : ''}`}
+                      onClick={() => setSelectedRole('auditor')}
+                    >
+                      Auditor
+                    </button>
+                    <button
+                      type="button"
+                      className={`role-btn ${selectedRole === 'client' ? 'active' : ''}`}
+                      onClick={() => setSelectedRole('client')}
+                    >
+                      Client
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+            <div className="detail-item">
+              <label className="detail-label">Email Address</label>
+              <div style={{ position: 'relative' }}>
+                <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                <input
+                  type="email"
+                  className="form-control"
+                  style={{ paddingLeft: '40px' }}
+                  placeholder="name@company.com"
+                  value={authEmail}
+                  onChange={e => setAuthEmail(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <div className="detail-item">
+              <label className="detail-label">Password</label>
+              <div style={{ position: 'relative' }}>
+                <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                <input
+                  type="password"
+                  className="form-control"
+                  style={{ paddingLeft: '40px' }}
+                  placeholder="••••••••"
+                  value={authPassword}
+                  onChange={e => setAuthPassword(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <button type="submit" className="auth-button" disabled={isAuthLoading}>
+              {isAuthLoading ? 'Processing...' : (authMode === 'login' ? 'Sign In' : 'Sign Up')}
+            </button>
+          </form>
+          <div className="auth-footer">
+            {authMode === 'login' ? "Don't have an account?" : "Already have an account?"}
+            <span className="auth-link" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}>
+              {authMode === 'login' ? 'Sign Up' : 'Sign In'}
+            </span>
+          </div>
+        </div>
+      </div >
+    )
   }
 
   return (
@@ -267,6 +709,17 @@ function App() {
             Reporting
           </div>
         </nav>
+
+        <div className="logout-container">
+          <div className="logout-btn" onClick={handleLogout}>
+            <LogOut size={20} />
+            <span>Sign Out</span>
+          </div>
+          <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '0 1rem' }}>
+            <div style={{ fontWeight: '600', color: '#fff' }}>{profile?.full_name || session.user.email}</div>
+            <div style={{ textTransform: 'capitalize' }}>{profile?.role || 'User'}</div>
+          </div>
+        </div>
       </aside>
 
       <main className="main-content">
@@ -279,72 +732,177 @@ function App() {
                 : 'Detailed list of organizational audit observations'}
             </p>
           </div>
-          {activeView === 'findings' && (
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <div style={{
-                background: 'var(--glass-bg)',
-                padding: '0.5rem 1rem',
-                borderRadius: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                border: '1px solid var(--border-color)'
-              }}>
-                <Search size={18} color="var(--text-secondary)" />
-                <input
-                  type="text"
-                  placeholder="Search findings..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ background: 'none', border: 'none', color: '#fff', outline: 'none', width: '200px' }}
-                />
-                {searchQuery && (
+          <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+            <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setShowNotifications(!showNotifications)}>
+              <Bell size={24} color={showNotifications ? 'var(--accent-blue)' : 'var(--text-secondary)'} />
+              {notifications.filter(n => !n.is_read).length > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-5px',
+                  right: '-5px',
+                  background: 'var(--error)',
+                  color: '#fff',
+                  fontSize: '0.65rem',
+                  padding: '2px 5px',
+                  borderRadius: '10px',
+                  fontWeight: '700',
+                  border: '2px solid #1a1f26'
+                }}>
+                  {notifications.filter(n => !n.is_read).length}
+                </span>
+              )}
+
+              {/* Notification Drawer */}
+              {showNotifications && (
+                <div style={{
+                  position: 'absolute',
+                  top: '40px',
+                  right: '0',
+                  width: '320px',
+                  maxHeight: '450px',
+                  background: '#1a1f26',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '0.75rem',
+                  boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
+                  zIndex: 1000,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }} onClick={e => e.stopPropagation()}>
+                  <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: '700' }}>Notifications</span>
+                    <span
+                      style={{ fontSize: '0.75rem', color: 'var(--accent-blue)', cursor: 'pointer' }}
+                      onClick={async () => {
+                        const { error } = await supabase.from('notifications').update({ is_read: true }).eq('user_id', session.user.id);
+                        if (!error) setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+                      }}
+                    >
+                      Mark all as read
+                    </span>
+                  </div>
+                  <div style={{ overflowY: 'auto', flex: 1 }}>
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                        No notifications yet
+                      </div>
+                    ) : (
+                      notifications.map(n => (
+                        <div
+                          key={n.id}
+                          onClick={() => markAsRead(n.id)}
+                          style={{
+                            padding: '1rem',
+                            borderBottom: '1px solid var(--border-color)',
+                            background: n.is_read ? 'transparent' : 'rgba(59, 130, 246, 0.05)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            gap: '0.75rem'
+                          }}>
+                          <div style={{
+                            width: '8px', height: '8px', borderRadius: '50%', background: n.is_read ? 'transparent' : 'var(--accent-blue)', marginTop: '6px'
+                          }} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: '600', fontSize: '0.875rem', color: n.is_read ? 'var(--text-secondary)' : '#fff' }}>{n.title}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{n.message}</div>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <Clock size={10} /> {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            {activeView === 'findings' && (
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{
+                  background: 'var(--glass-bg)',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  border: '1px solid var(--border-color)'
+                }}>
+                  <Search size={18} color="var(--text-secondary)" />
+                  <input
+                    type="text"
+                    placeholder="Search findings..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ background: 'none', border: 'none', color: '#fff', outline: 'none', width: '200px' }}
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0 4px' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                {(profile?.role === 'auditor' || profile?.role === 'manager') && (
                   <button
-                    onClick={() => setSearchQuery('')}
-                    style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0 4px' }}
+                    onClick={() => setShowNewModal(true)}
+                    style={{
+                      background: 'var(--accent-blue)',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '0.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      cursor: 'pointer',
+                      fontWeight: '600'
+                    }}
                   >
-                    <X size={14} />
+                    <Plus size={18} />
+                    New Finding
                   </button>
                 )}
+                <button
+                  onClick={downloadCSV}
+                  style={{
+                    background: 'var(--glass-bg)',
+                    color: '#fff',
+                    border: '1px solid var(--border-color)',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  <Download size={18} />
+                  Export CSV
+                </button>
+                <button
+                  onClick={generatePDF}
+                  style={{
+                    background: 'var(--accent-blue)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  <FileText size={18} />
+                  Export PDF
+                </button>
               </div>
-              <button
-                onClick={() => setShowNewModal(true)}
-                style={{
-                  background: 'var(--accent-blue)',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  cursor: 'pointer',
-                  fontWeight: '600'
-                }}
-              >
-                <Plus size={18} />
-                New Finding
-              </button>
-              <button
-                onClick={downloadCSV}
-                style={{
-                  background: 'var(--glass-bg)',
-                  color: '#fff',
-                  border: '1px solid var(--border-color)',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  cursor: 'pointer',
-                  fontWeight: '600'
-                }}
-              >
-                <Download size={18} />
-                Export Report
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </header>
 
         {activeView === 'overview' ? (
@@ -400,7 +958,7 @@ function App() {
               <h2>Active Findings List</h2>
             </div>
 
-            {loading ? (
+            {isDataLoading ? (
               <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
                 Loading audit data from Supabase...
               </div>
@@ -462,9 +1020,30 @@ function App() {
                 </div>
                 <h2 style={{ fontSize: '1.5rem', lineHeight: '1.3' }}>{selectedObs.condition}</h2>
               </div>
-              <button className="close-btn" onClick={() => setSelectedObs(null)}>
-                <X size={24} />
-              </button>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <button
+                  onClick={() => generateDetailedPDF(selectedObs)}
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.1)',
+                    color: 'var(--accent-blue)',
+                    border: '1px solid var(--accent-blue)',
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: '0.4rem',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  <FileText size={14} />
+                  Export Details PDF
+                </button>
+                <button className="close-btn" onClick={() => setSelectedObs(null)}>
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             <div className="modal-body">
@@ -487,6 +1066,50 @@ function App() {
                 </div>
               </div>
 
+              {/* Evidence Section */}
+              {selectedObs.evidence_urls && selectedObs.evidence_urls.length > 0 && (
+                <div style={{ marginTop: '2rem' }}>
+                  <div className="detail-label" style={{ marginBottom: '1rem' }}>Supporting Evidence</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '1rem' }}>
+                    {selectedObs.evidence_urls.map((url, i) => {
+                      const isImage = url.match(/\.(jpg|jpeg|png|gif|webp)/i)
+                      return (
+                        <a
+                          key={i}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            background: 'var(--glass-bg)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '0.75rem',
+                            padding: '0.5rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            textDecoration: 'none',
+                            color: 'inherit',
+                            transition: 'transform 0.2s'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                          {isImage ? (
+                            <img src={url} style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '0.4rem' }} alt="Evidence" />
+                          ) : (
+                            <div style={{ height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <FileText size={32} color="var(--accent-blue)" />
+                            </div>
+                          )}
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>View File <ExternalLink size={10} /></span>
+                        </a>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {selectedObs.management_responses && selectedObs.management_responses.length > 0 ? (
                 <div className="management-section">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#10b981' }}>
@@ -502,7 +1125,7 @@ function App() {
                   </div>
                   <div style={{ display: 'flex', gap: '2rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <User size={16} color="var(--text-secondary)" />
+                      <UserIcon size={16} color="var(--text-secondary)" />
                       <span style={{ fontSize: '0.875rem' }}>{selectedObs.management_responses[0].responsible_person}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -515,75 +1138,81 @@ function App() {
                   </div>
                 </div>
               ) : (
-                <div className="management-section" style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--accent-blue)' }}>
-                    <Plus size={20} />
-                    <h3 style={{ textTransform: 'uppercase', fontSize: '0.875rem', fontWeight: '700' }}>Submit Management Response</h3>
+                profile?.role === 'client' ? (
+                  <div className="management-section" style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--accent-blue)' }}>
+                      <Plus size={20} />
+                      <h3 style={{ textTransform: 'uppercase', fontSize: '0.875rem', fontWeight: '700' }}>Management Action Plan (Client Response)</h3>
+                    </div>
+                    <form onSubmit={handleMgmtSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div className="detail-item">
+                        <label className="detail-label">Management Response</label>
+                        <textarea
+                          className="form-control"
+                          required
+                          placeholder="Acknowledge the finding..."
+                          value={mgmtResp.management_response}
+                          onChange={e => setMgmtResp({ ...mgmtResp, management_response: e.target.value })}
+                        />
+                      </div>
+                      <div className="detail-item">
+                        <label className="detail-label">Action Plan</label>
+                        <textarea
+                          className="form-control"
+                          required
+                          placeholder="Detail the steps for remediation..."
+                          value={mgmtResp.action_plan}
+                          onChange={e => setMgmtResp({ ...mgmtResp, action_plan: e.target.value })}
+                        />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="detail-item">
+                          <label className="detail-label">Responsible Person</label>
+                          <input
+                            className="form-control"
+                            required
+                            placeholder="Name..."
+                            value={mgmtResp.responsible_person}
+                            onChange={e => setMgmtResp({ ...mgmtResp, responsible_person: e.target.value })}
+                          />
+                        </div>
+                        <div className="detail-item">
+                          <label className="detail-label">Target Date</label>
+                          <input
+                            type="date"
+                            className="form-control"
+                            required
+                            value={mgmtResp.target_date}
+                            onChange={e => setMgmtResp({ ...mgmtResp, target_date: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        style={{
+                          background: 'var(--accent-blue)',
+                          color: '#fff',
+                          border: 'none',
+                          padding: '0.75rem',
+                          borderRadius: '0.5rem',
+                          cursor: 'pointer',
+                          fontWeight: '600',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        {isSubmitting ? 'Submitting...' : <><Send size={18} /> Submit Plan</>}
+                      </button>
+                    </form>
                   </div>
-                  <form onSubmit={handleMgmtSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div className="detail-item">
-                      <label className="detail-label">Management Response</label>
-                      <textarea
-                        className="form-control"
-                        required
-                        placeholder="Acknowledge the finding..."
-                        value={mgmtResp.management_response}
-                        onChange={e => setMgmtResp({ ...mgmtResp, management_response: e.target.value })}
-                      />
-                    </div>
-                    <div className="detail-item">
-                      <label className="detail-label">Action Plan</label>
-                      <textarea
-                        className="form-control"
-                        required
-                        placeholder="Detail the steps for remediation..."
-                        value={mgmtResp.action_plan}
-                        onChange={e => setMgmtResp({ ...mgmtResp, action_plan: e.target.value })}
-                      />
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <div className="detail-item">
-                        <label className="detail-label">Responsible Person</label>
-                        <input
-                          className="form-control"
-                          required
-                          placeholder="Name..."
-                          value={mgmtResp.responsible_person}
-                          onChange={e => setMgmtResp({ ...mgmtResp, responsible_person: e.target.value })}
-                        />
-                      </div>
-                      <div className="detail-item">
-                        <label className="detail-label">Target Date</label>
-                        <input
-                          type="date"
-                          className="form-control"
-                          required
-                          value={mgmtResp.target_date}
-                          onChange={e => setMgmtResp({ ...mgmtResp, target_date: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      style={{
-                        background: 'var(--accent-blue)',
-                        color: '#fff',
-                        border: 'none',
-                        padding: '0.75rem',
-                        borderRadius: '0.5rem',
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem'
-                      }}
-                    >
-                      {isSubmitting ? 'Submitting...' : <><Send size={18} /> Submit Plan</>}
-                    </button>
-                  </form>
-                </div>
+                ) : (
+                  <div className="management-section" style={{ background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                    <p style={{ color: 'var(--text-secondary)' }}>Pending Management Response</p>
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -601,9 +1230,13 @@ function App() {
             </div>
             <form className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }} onSubmit={async (e) => {
               e.preventDefault()
-              const { error } = await supabase.from('audit_observations').insert([newObs])
+              const { error } = await supabase.from('audit_observations').insert([{
+                ...newObs,
+                evidence_urls: uploadedFiles
+              }])
               if (!error) {
                 setShowNewModal(false)
+                setUploadedFiles([])
                 setNewObs({
                   procedure_id: '',
                   condition: '',
@@ -692,20 +1325,56 @@ function App() {
                 />
               </div>
 
+              <div className="detail-item">
+                <label className="detail-label">Attachments (Evidence)</label>
+                <div style={{
+                  border: '2px dashed var(--border-color)',
+                  borderRadius: '0.75rem',
+                  padding: '1.5rem',
+                  textAlign: 'center',
+                  background: 'var(--glass-bg)',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  transition: 'border-color 0.2s'
+                }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-blue)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
+                >
+                  <input
+                    type="file"
+                    multiple
+                    onChange={handleFileUpload}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                  />
+                  <Upload color="var(--text-secondary)" size={24} style={{ marginBottom: '0.5rem' }} />
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                    {isUploading ? 'Uploading to Supabase...' : 'Click or Drag files to upload proof'}
+                  </p>
+                </div>
+                {uploadedFiles.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1rem', padding: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '0.5rem' }}>
+                    <CheckCircle size={16} color="var(--success)" />
+                    <span style={{ fontSize: '0.75rem', color: '#fff' }}>{uploadedFiles.length} files successfully attached</span>
+                  </div>
+                )}
+              </div>
+
               <button
                 type="submit"
+                disabled={isUploading}
                 style={{
-                  background: 'var(--accent-blue)',
+                  background: isUploading ? 'var(--border-color)' : 'var(--accent-blue)',
                   color: '#fff',
                   border: 'none',
                   padding: '1rem',
                   borderRadius: '0.5rem',
-                  cursor: 'pointer',
+                  cursor: isUploading ? 'not-allowed' : 'pointer',
                   fontWeight: '700',
-                  marginTop: '1rem'
+                  marginTop: '1rem',
+                  transition: 'opacity 0.2s'
                 }}
               >
-                Save Observation
+                {isUploading ? 'Finalizing Uploads...' : 'Save Observation'}
               </button>
             </form>
           </div>
