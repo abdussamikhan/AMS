@@ -447,6 +447,15 @@ function App() {
     doc.text(`Procedure: ${obs.audit_procedures?.procedure_name}`, 14, 63)
     doc.text(`Category: ${obs.audit_procedures?.framework_mapping?.risk_categories?.category_name}`, 14, 68)
 
+    // Title (Summary)
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(0)
+    doc.text('Title:', 14, 76)
+    doc.setFont('helvetica', 'normal')
+    const titleText = obs.title || obs.condition.substring(0, 80)
+    doc.text(titleText, 14, 82, { maxWidth: 180 })
+
     // Risk Badge
     const rating = obs.risk_rating
     doc.setFillColor(rating === 'Critical' ? 239 : rating === 'High' ? 248 : 251, rating === 'Critical' ? 68 : rating === 'High' ? 113 : 191, rating === 'Critical' ? 68 : rating === 'High' ? 113 : 36)
@@ -458,10 +467,10 @@ function App() {
     // Section 2: Finding Details
     doc.setTextColor(41, 128, 185)
     doc.setFontSize(14)
-    doc.text('2. FINDING DETAILS (5C MODEL)', 14, 85)
+    doc.text('2. FINDING DETAILS (5C MODEL)', 14, 95)
 
     autoTable(doc, {
-      startY: 90,
+      startY: 100,
       body: [
         ['CONDITION', obs.condition],
         ['CRITERIA', obs.criteria],
