@@ -346,7 +346,7 @@ function App() {
   }
 
   const generatePDF = () => {
-    const doc = new jsPDF()
+    const doc = new jsPDF('landscape') // Landscape orientation
     const timestamp = new Date().toLocaleString()
 
     // Title & Header
@@ -365,7 +365,7 @@ function App() {
     // Summary Box
     doc.setDrawColor(200)
     doc.setFillColor(245, 247, 250)
-    doc.rect(14, 50, 182, 25, 'F')
+    doc.rect(14, 50, 260, 25, 'F') // Wider for landscape
     doc.setTextColor(0)
     doc.setFontSize(11)
     doc.text('SUMMARY STATISTICS', 20, 58)
@@ -376,27 +376,29 @@ function App() {
     const tableRows = filteredObservations.map((obs, index) => [
       index + 1,
       `${obs.audit_procedures?.framework_mapping?.framework_name} / ${obs.audit_procedures?.framework_mapping?.reference_code}`,
-      obs.title || obs.condition.substring(0, 60) + '...',
+      obs.title || obs.condition.substring(0, 40) + '...',
+      obs.condition.substring(0, 80) + (obs.condition.length > 80 ? '...' : ''),
       obs.risk_rating,
       obs.management_responses?.[0]?.status || 'Open'
     ])
 
     autoTable(doc, {
       startY: 85,
-      head: [['#', 'Reference', 'Title', 'Risk', 'Status']],
+      head: [['#', 'Reference', 'Title', 'Finding (Condition)', 'Risk', 'Status']],
       body: tableRows,
       theme: 'grid',
       headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
-      styles: { fontSize: 9, cellPadding: 4 },
+      styles: { fontSize: 8, cellPadding: 3 },
       columnStyles: {
         0: { cellWidth: 10 },
-        1: { cellWidth: 35 },
-        2: { cellWidth: 80 },
-        3: { cellWidth: 25 },
-        4: { cellWidth: 25 }
+        1: { cellWidth: 40 },
+        2: { cellWidth: 55 },
+        3: { cellWidth: 100 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 20 }
       },
       didParseCell: (data) => {
-        if (data.section === 'body' && data.column.index === 3) {
+        if (data.section === 'body' && data.column.index === 4) {
           const rating = data.cell.raw as string
           if (rating === 'Critical') data.cell.styles.textColor = [239, 68, 68]
           if (rating === 'High') data.cell.styles.textColor = [248, 113, 113]
@@ -410,7 +412,7 @@ function App() {
       doc.setPage(i)
       doc.setFontSize(8)
       doc.setTextColor(150)
-      doc.text(`Page ${i} of ${pageCount} - Confidential AMS Internal Report`, 14, 285)
+      doc.text(`Page ${i} of ${pageCount} - Confidential AMS Internal Report`, 14, 200) // Adjusted for landscape
     }
 
     doc.save(`AMS_Audit_Report_${new Date().toISOString().split('T')[0]}.pdf`)
