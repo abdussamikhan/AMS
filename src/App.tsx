@@ -376,14 +376,14 @@ function App() {
     const tableRows = filteredObservations.map((obs, index) => [
       index + 1,
       `${obs.audit_procedures?.framework_mapping?.framework_name} / ${obs.audit_procedures?.framework_mapping?.reference_code}`,
-      obs.condition,
+      obs.title || obs.condition.substring(0, 60) + '...',
       obs.risk_rating,
       obs.management_responses?.[0]?.status || 'Open'
     ])
 
     autoTable(doc, {
       startY: 85,
-      head: [['#', 'Reference', 'Finding (Condition)', 'Risk', 'Status']],
+      head: [['#', 'Reference', 'Title', 'Risk', 'Status']],
       body: tableRows,
       theme: 'grid',
       headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
