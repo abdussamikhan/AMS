@@ -347,7 +347,7 @@ function App() {
 
   const generatePDF = () => {
     const doc = new jsPDF('landscape') // Landscape orientation
-    const timestamp = new Date().toLocaleString()
+    const timestamp = new Date().toISOString().split('T')[0] + ' ' + new Date().toTimeString().split(' ')[0]
 
     // Title & Header
     doc.setFontSize(22)
@@ -380,7 +380,7 @@ function App() {
       obs.condition.substring(0, 80) + (obs.condition.length > 80 ? '...' : ''),
       obs.risk_rating,
       obs.management_responses?.[0]?.status || 'Open',
-      new Date(obs.created_at).toLocaleDateString()
+      new Date(obs.created_at).toISOString().split('T')[0]
     ])
 
     autoTable(doc, {
@@ -422,7 +422,7 @@ function App() {
 
   const generateDetailedPDF = (obs: Observation) => {
     const doc = new jsPDF()
-    const timestamp = new Date().toLocaleString()
+    const timestamp = new Date().toISOString().split('T')[0] + ' ' + new Date().toTimeString().split(' ')[0]
 
     // Title & Header
     doc.setFontSize(22)
@@ -864,7 +864,7 @@ function App() {
                             <div style={{ fontWeight: '600', fontSize: '0.875rem', color: n.is_read ? 'var(--text-secondary)' : '#fff' }}>{n.title}</div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{n.message}</div>
                             <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                              <Clock size={10} /> {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              <Clock size={10} /> {new Date(n.created_at).toISOString().split('T')[1].substring(0, 5)}
                             </div>
                           </div>
                         </div>
@@ -1041,7 +1041,7 @@ function App() {
                           <span>•</span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                             <Clock size={12} />
-                            {new Date(obs.created_at).toLocaleDateString()}
+                            {new Date(obs.created_at).toISOString().split('T')[0]}
                           </span>
                         </div>
                       </div>
@@ -1082,7 +1082,7 @@ function App() {
                     <span>•</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                       <Clock size={12} />
-                      {new Date(selectedObs.created_at).toLocaleDateString()}
+                      {new Date(selectedObs.created_at).toISOString().split('T')[0]}
                     </span>
                   </span>
                 </div>
