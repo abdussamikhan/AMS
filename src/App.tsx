@@ -70,7 +70,8 @@ function App() {
   const [authPassword, setAuthPassword] = useState('')
   const [authFullName, setAuthFullName] = useState('')
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
+  const [uploadedAttachments, setUploadedAttachments] = useState<{ url: string, title: string }[]>([])
+  const [attachmentTitle, setAttachmentTitle] = useState('')
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
   const [selectedRole, setSelectedRole] = useState<'auditor' | 'manager' | 'client'>('manager')
   const [observations, setObservations] = useState<Observation[]>([])
@@ -571,9 +572,13 @@ function App() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
+    if (!attachmentTitle.trim()) {
+      alert('Please enter a title for the attachment first.')
+      return
+    }
 
     setIsUploading(true)
-    const newUrls = [...uploadedFiles]
+    const newAttachments = [...uploadedAttachments]
 
     for (const file of Array.from(files)) {
       const fileExt = file.name.split('.').pop()
@@ -590,11 +595,12 @@ function App() {
         const { data: { publicUrl } } = supabase.storage
           .from('audit-evidence')
           .getPublicUrl(filePath)
-        newUrls.push(publicUrl)
+        newAttachments.push({ url: publicUrl, title: attachmentTitle })
       }
     }
 
-    setUploadedFiles(newUrls)
+    setUploadedAttachments(newAttachments)
+    setAttachmentTitle('') // Clear title after upload
     setIsUploading(false)
   }
 
@@ -1058,8 +1064,13 @@ function App() {
               <div>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '0.5rem' }}>
                   {getRatingBadge(selectedObs.risk_rating)}
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                    {selectedObs.audit_procedures?.framework_mapping?.framework_name} • {selectedObs.audit_procedures?.framework_mapping?.reference_code}
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {selectedObs.audit_procedures?.framework_mapping?.framework_name} • {selectedObs.audit_procedures?.framework_mapping?.reference_code} • {selectedObs.audit_procedures?.framework_mapping?.risk_categories?.category_name}
+                    <span>•</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <Clock size={12} />
+                      {new Date(selectedObs.created_at).toLocaleDateString()}
+                    </span>
                   </span>
                 </div>
                 <h2 style={{ fontSize: '1.5rem', lineHeight: '1.3' }}>{selectedObs.title || selectedObs.condition}</h2>
@@ -1150,7 +1161,74 @@ function App() {
                               <FileText size={32} color="var(--accent-blue)" />
                             </div>
                           )}
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>View File <ExternalLink size={10} /></span>
+                          <span style={{
+                            fontSize: '0.7rem',
+                            color: '#fff',
+                            maxWidth: '100%',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            textAlign: 'center'
+                          }}>
+                            {decodeURIComponent(url.split('/').pop()?.split('?')[0] || 'Unknown File')}
+                          </span>
+                          <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>View File <ExternalLink size={10} /></span>
+                        </a>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Evidence with Titles (evidence_json) */}
+              {selectedObs.evidence_json && selectedObs.evidence_json.length > 0 && (
+                <div style={{ marginTop: '2rem' }}>
+                  <div className="detail-label" style={{ marginBottom: '1rem' }}>Supporting Evidence</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '1rem' }}>
+                    {selectedObs.evidence_json.map((item: any, i: number) => {
+                      const isImage = item.url.match(/\.(jpg|jpeg|png|gif|webp)/i)
+                      return (
+                        <a
+                          key={i}
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            background: 'var(--glass-bg)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '0.75rem',
+                            padding: '0.75rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            textDecoration: 'none',
+                            color: 'inherit',
+                            transition: 'transform 0.2s'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                          {isImage ? (
+                            <img src={item.url} style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '0.4rem' }} alt={item.title} />
+                          ) : (
+                            <div style={{ height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <FileText size={32} color="var(--accent-blue)" />
+                            </div>
+                          )}
+                          <span style={{
+                            fontSize: '0.75rem',
+                            color: '#fff',
+                            maxWidth: '100%',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            textAlign: 'center',
+                            fontWeight: '600'
+                          }}>
+                            {item.title}
+                          </span>
+                          <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)' }}>View Document <ExternalLink size={10} /></span>
                         </a>
                       )
                     })}
@@ -1327,11 +1405,11 @@ function App() {
                 e.preventDefault()
                 const { error } = await supabase.from('audit_observations').insert([{
                   ...newObs,
-                  evidence_urls: uploadedFiles
+                  evidence_json: uploadedAttachments
                 }])
                 if (!error) {
                   setShowNewModal(false)
-                  setUploadedFiles([])
+                  setUploadedAttachments([])
                   setNewObs({
                     procedure_id: '',
                     condition: '',
@@ -1436,34 +1514,47 @@ function App() {
 
                 <div className="detail-item">
                   <label className="detail-label">Attachments (Evidence)</label>
-                  <div style={{
-                    border: '2px dashed var(--border-color)',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    textAlign: 'center',
-                    background: 'var(--glass-bg)',
-                    cursor: 'pointer',
-                    position: 'relative',
-                    transition: 'border-color 0.2s'
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-blue)'}
-                    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
-                  >
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                     <input
-                      type="file"
-                      multiple
-                      onChange={handleFileUpload}
-                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                      className="form-control"
+                      placeholder="Enter file title (e.g. Audit Policy)..."
+                      value={attachmentTitle}
+                      onChange={e => setAttachmentTitle(e.target.value)}
                     />
-                    <Upload color="var(--text-secondary)" size={24} style={{ marginBottom: '0.5rem' }} />
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                      {isUploading ? 'Uploading to Supabase...' : 'Click or Drag files to upload proof'}
-                    </p>
+                    <div style={{
+                      border: '2px dashed var(--border-color)',
+                      borderRadius: '0.5rem',
+                      padding: '0.5rem',
+                      textAlign: 'center',
+                      background: 'var(--glass-bg)',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem'
+                    }}
+                    >
+                      <input
+                        type="file"
+                        onChange={handleFileUpload}
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                      />
+                      <Upload color="var(--text-secondary)" size={16} />
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                        {isUploading ? 'Uploading...' : 'Choose File'}
+                      </span>
+                    </div>
                   </div>
-                  {uploadedFiles.length > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1rem', padding: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '0.5rem' }}>
-                      <CheckCircle size={16} color="var(--success)" />
-                      <span style={{ fontSize: '0.75rem', color: '#fff' }}>{uploadedFiles.length} files successfully attached</span>
+                  {uploadedAttachments.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+                      {uploadedAttachments.map((att, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '0.5rem' }}>
+                          <CheckCircle size={14} color="var(--success)" />
+                          <span style={{ fontSize: '0.75rem', color: '#fff' }}>{att.title}</span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>File attached</span>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>

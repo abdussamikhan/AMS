@@ -27,6 +27,7 @@ export type Database = {
           recommendation: string | null
           risk_rating: Database["public"]["Enums"]["risk_level"]
           title: string
+          evidence_json: { url: string, title: string }[] | null
         }
         Insert: {
           cause?: string | null
@@ -40,6 +41,7 @@ export type Database = {
           recommendation?: string | null
           risk_rating: Database["public"]["Enums"]["risk_level"]
           title: string
+          evidence_json?: { url: string, title: string }[] | null
         }
         Update: {
           cause?: string | null
@@ -53,6 +55,7 @@ export type Database = {
           recommendation?: string | null
           risk_rating?: Database["public"]["Enums"]["risk_level"]
           title?: string
+          evidence_json?: { url: string, title: string }[] | null
         }
         Relationships: [
           {
