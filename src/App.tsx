@@ -29,7 +29,8 @@ import {
   Bell,
   Clock,
   Sparkles,
-  Wand2
+  Wand2,
+  Grid
 } from 'lucide-react'
 import {
   BarChart,
@@ -58,6 +59,13 @@ type Observation = Database['public']['Tables']['audit_observations']['Row'] & {
   }
   management_responses: Database['public']['Tables']['management_responses']['Row'][]
   evidence_urls?: string[]
+}
+
+type RCMEntry = Database['public']['Tables']['risk_control_matrix']['Row'] & {
+  industries?: { industry_name: string }
+  sectors?: { sector_name: string }
+  functions?: { function_name: string }
+  risk_categories?: { category_name: string }
 }
 
 function App() {
@@ -99,9 +107,30 @@ function App() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
 
-  // AI State
   const [aiInput, setAiInput] = useState('')
+  const [rcmAiInput, setRcmAiInput] = useState('')
   const [isAIProcessing, setIsAIProcessing] = useState(false)
+  const [isRcmAiProcessing, setIsRcmAiProcessing] = useState(false)
+
+  // RCM State
+  const [rcmEntries, setRcmEntries] = useState<RCMEntry[]>([])
+  const [industries, setIndustries] = useState<any[]>([])
+  const [allSectors, setAllSectors] = useState<any[]>([])
+  const [allFunctions, setAllFunctions] = useState<any[]>([])
+  const [riskCats, setRiskCats] = useState<any[]>([])
+  const [rcmFilters, setRcmFilters] = useState({ industry: '', sector: '', function: '' })
+  const [showNewRcmModal, setShowNewRcmModal] = useState(false)
+  const [newRcm, setNewRcm] = useState({
+    industry_id: '',
+    sector_id: '',
+    function_id: '',
+    risk_category_id: '',
+    risk_description: '',
+    control_description: '',
+    reference_standard: '',
+    control_type: 'Preventive' as any,
+    control_frequency: 'Continuous' as any
+  })
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -112,13 +141,146 @@ function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      if (session) fetchProfile(session.user.id)
+      if (session) {
+        fetchProfile(session.user.id)
+        fetchRcmData()
+        fetchRcmContext()
+      }
       else setProfile(null)
       setIsAppLoading(false)
     })
 
     return () => subscription.unsubscribe()
   }, [])
+
+  async function fetchRcmData() {
+    const { data } = await supabase
+      .from('risk_control_matrix')
+      .select(`
+        *,
+        industries(industry_name),
+        sectors(sector_name),
+        functions(function_name),
+        risk_categories(category_name)
+      `)
+      .order('created_at', { ascending: false })
+    if (data) setRcmEntries(data as RCMEntry[])
+  }
+
+  async function fetchRcmContext() {
+    try {
+      const [ind, sec, func, cat] = await Promise.all([
+        supabase.from('industries').select('*').order('industry_name'),
+        supabase.from('sectors').select('*').order('sector_name'),
+        supabase.from('functions').select('*').order('function_name'),
+        supabase.from('risk_categories').select('*').order('category_name')
+      ])
+
+      let finalIndustries = ind.data || []
+      let finalSectors = sec.data || []
+      let finalFunctions = func.data || []
+      let finalCategories = cat.data || []
+
+      // Ensure "Generic" entries exist
+      let genInd = finalIndustries.find(i => i.industry_name === 'Generic')
+      if (!genInd) {
+        const { data } = await supabase.from('industries').insert({ industry_name: 'Generic' }).select().single()
+        if (data) { genInd = data; finalIndustries = [data, ...finalIndustries] }
+      }
+
+      let genSec = null
+      if (genInd) {
+        genSec = finalSectors.find(s => s.sector_name === 'Generic' && s.industry_id === genInd.industry_id)
+        if (!genSec) {
+          const { data } = await supabase.from('sectors').insert({ sector_name: 'Generic', industry_id: genInd.industry_id }).select().single()
+          if (data) { genSec = data; finalSectors = [data, ...finalSectors] }
+        }
+      }
+
+      let genFunc = null
+      if (genSec) {
+        genFunc = finalFunctions.find(f => f.function_name === 'Generic' && f.sector_id === genSec.sector_id)
+        if (!genFunc) {
+          const { data } = await supabase.from('functions').insert({ function_name: 'Generic', sector_id: genSec.sector_id }).select().single()
+          if (data) { genFunc = data; finalFunctions = [data, ...finalFunctions] }
+        }
+      }
+
+      // Ensure "Strategic" risk category exists
+      let stratCat = finalCategories.find(c => c.category_name === 'Strategic')
+      if (!stratCat) {
+        const { data } = await supabase.from('risk_categories').insert({ category_name: 'Strategic' }).select().single()
+        if (data) { stratCat = data; finalCategories = [data, ...finalCategories] }
+      }
+
+      setIndustries(finalIndustries)
+      setAllSectors(finalSectors)
+      setAllFunctions(finalFunctions)
+      setRiskCats(finalCategories)
+
+      // Set defaults for new entry and filters
+      if (genInd && genSec && genFunc && stratCat) {
+        setNewRcm(prev => ({
+          ...prev,
+          industry_id: genInd.industry_id,
+          sector_id: genSec.sector_id,
+          function_id: genFunc.function_id,
+          risk_category_id: stratCat.risk_id
+        }))
+        setRcmFilters({
+          industry: genInd.industry_id,
+          sector: genSec.sector_id,
+          function: genFunc.function_id
+        })
+      }
+    } catch (err) {
+      console.error('Error fetching RCM context:', err)
+    }
+  }
+
+  const handleCreateRcm = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const { error } = await supabase.from('risk_control_matrix').insert([newRcm])
+    if (error) {
+      alert('Error creating RCM entry: ' + error.message)
+    } else {
+      setShowNewRcmModal(false)
+      fetchRcmData()
+      setNewRcm({
+        industry_id: industries.find(i => i.industry_name === 'Generic')?.industry_id || '',
+        sector_id: allSectors.find(s => s.sector_name === 'Generic')?.sector_id || '',
+        function_id: allFunctions.find(f => f.function_name === 'Generic')?.function_id || '',
+        risk_category_id: riskCats.find(c => c.category_name === 'Strategic')?.risk_id || '',
+        risk_description: '',
+        control_description: '',
+        reference_standard: '',
+        control_type: 'Preventive',
+        control_frequency: 'Continuous'
+      })
+    }
+  }
+
+  const handleRcmAiGenerate = async () => {
+    if (!rcmAiInput.trim()) return
+    setIsRcmAiProcessing(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('process-rcm-entry', {
+        body: { rawText: rcmAiInput }
+      })
+      if (error) throw error
+      setNewRcm(prev => ({
+        ...prev,
+        risk_description: data.risk_description,
+        control_description: data.control_description,
+        reference_standard: data.reference_standard
+      }))
+      setRcmAiInput('')
+    } catch (err: any) {
+      alert('Failed to generate RCM entry: ' + err.message)
+    } finally {
+      setIsRcmAiProcessing(false)
+    }
+  }
 
   async function fetchProfile(uid: string) {
     const { data } = await supabase.from('profiles').select('*').eq('id', uid).single()
@@ -191,6 +353,8 @@ function App() {
   const handleLogout = async () => {
     await supabase.auth.signOut()
     setActiveView('overview')
+    setRcmEntries([])
+    setProfile(null)
   }
 
   // Management response form state
@@ -754,6 +918,13 @@ function App() {
             <CheckCircle2 />
             Control Findings
           </div>
+          <div
+            className={`nav-link ${activeView === 'rcm' ? 'active' : ''}`}
+            onClick={() => setActiveView('rcm')}
+          >
+            <Grid />
+            Risk Control Matrix
+          </div>
           <div className="nav-link">
             <ShieldAlert />
             Risk Register
@@ -783,11 +954,13 @@ function App() {
       <main className="main-content">
         <header className="header" style={{ marginBottom: activeView === 'findings' ? '2rem' : '3rem' }}>
           <div>
-            <h1>{activeView === 'overview' ? 'Audit Overview' : 'Control Findings'}</h1>
+            <h1>{activeView === 'overview' ? 'Audit Overview' : activeView === 'rcm' ? 'Risk Control Matrix' : 'Control Findings'}</h1>
             <p style={{ color: 'var(--text-secondary)' }}>
               {activeView === 'overview'
                 ? 'High-level risk distribution and analytics'
-                : 'Detailed list of organizational audit observations'}
+                : activeView === 'rcm'
+                  ? 'Map risks to internal controls across the organization'
+                  : 'Detailed list of organizational audit observations'}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
@@ -1009,6 +1182,129 @@ function App() {
               </div>
             </section>
           </>
+        ) : activeView === 'rcm' ? (
+          <div className="rcm-view">
+            {/* RCM Filters */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) auto', gap: '1rem', marginBottom: '2rem', background: 'var(--card-bg)', padding: '1.25rem', borderRadius: '1rem', border: '1px solid var(--border-color)', alignItems: 'center' }}>
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Industry</label>
+                <select
+                  className="form-control"
+                  value={rcmFilters.industry}
+                  onChange={e => setRcmFilters(prev => ({ ...prev, industry: e.target.value, sector: '', function: '' }))}
+                >
+                  <option value="">All Industries</option>
+                  {industries.map(i => <option key={i.industry_id} value={i.industry_id}>{i.industry_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Sector</label>
+                <select
+                  className="form-control"
+                  value={rcmFilters.sector}
+                  onChange={e => setRcmFilters(prev => ({ ...prev, sector: e.target.value, function: '' }))}
+                >
+                  <option value="">All Sectors</option>
+                  {allSectors.filter(s => !rcmFilters.industry || s.industry_id === rcmFilters.industry).map(s => (
+                    <option key={s.sector_id} value={s.sector_id}>{s.sector_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Function</label>
+                <select
+                  className="form-control"
+                  value={rcmFilters.function}
+                  onChange={e => setRcmFilters(prev => ({ ...prev, function: e.target.value }))}
+                >
+                  <option value="">All Functions</option>
+                  {allFunctions.filter(f => !rcmFilters.sector || f.sector_id === rcmFilters.sector).map(f => (
+                    <option key={f.function_id} value={f.function_id}>{f.function_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Search Matrix</label>
+                <div style={{ position: 'relative' }}>
+                  <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <input
+                    className="form-control"
+                    style={{ paddingLeft: '35px' }}
+                    placeholder="Search descriptions..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+              <button
+                className="btn btn-primary"
+                style={{ alignSelf: 'end', height: '42px', padding: '0 1.5rem', background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '0.5rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                onClick={() => setShowNewRcmModal(true)}
+              >
+                <Plus size={18} />
+                New Control
+              </button>
+            </div>
+
+            {/* RCM Table */}
+            <div style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)' }}>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>INDUSTRY / SECTOR</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>FUNCTION</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>RISK DESCRIPTION</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>CONTROL DESCRIPTION</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>TYPE</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>FREQ</th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>REF</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rcmEntries
+                    .filter(entry => !rcmFilters.industry || entry.industry_id === rcmFilters.industry)
+                    .filter(entry => !rcmFilters.sector || entry.sector_id === rcmFilters.sector)
+                    .filter(entry => !rcmFilters.function || entry.function_id === rcmFilters.function)
+                    .filter(entry => !searchQuery ||
+                      entry.risk_description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      entry.control_description.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map(entry => (
+                      <tr key={entry.rcm_id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>{entry.industries?.industry_name}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{entry.sectors?.sector_name}</div>
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.875rem' }}>{entry.functions?.function_name}</td>
+                        <td style={{ padding: '1rem', fontSize: '0.875rem', maxWidth: '300px' }}>{entry.risk_description}</td>
+                        <td style={{ padding: '1rem', fontSize: '0.875rem', maxWidth: '300px' }}>{entry.control_description}</td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{
+                            padding: '0.25rem 0.6rem',
+                            borderRadius: '1rem',
+                            fontSize: '0.7rem',
+                            fontWeight: '700',
+                            background: entry.control_type === 'Preventive' ? 'rgba(16, 185, 129, 0.1)' : entry.control_type === 'Detective' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                            color: entry.control_type === 'Preventive' ? '#10b981' : entry.control_type === 'Detective' ? '#3b82f6' : '#f59e0b'
+                          }}>
+                            {entry.control_type}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{entry.control_frequency}</td>
+                        <td style={{ padding: '1rem', fontSize: '0.75rem', color: 'var(--accent-blue)', fontWeight: '600' }}>{entry.reference_standard}</td>
+                      </tr>
+                    ))}
+                  {rcmEntries.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        No Risk Control Matrix entries found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         ) : (
           <section className="observations-section">
             <div className="section-title">
@@ -1591,6 +1887,189 @@ function App() {
                 </button>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+      {/* New RCM Modal */}
+      {showNewRcmModal && (
+        <div className="modal-overlay" onClick={() => setShowNewRcmModal(false)}>
+          <div className="modal-content" style={{ width: '800px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ padding: '0.5rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '0.5rem' }}>
+                  <Grid size={20} color="var(--accent-blue)" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: '700' }}>New Risk Control</h2>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Define a new risk scenario and its mitigating control</p>
+                </div>
+              </div>
+              <button className="close-btn" onClick={() => setShowNewRcmModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem', background: 'rgba(59, 130, 246, 0.05)', borderBottom: '1px solid var(--border-color)' }}>
+              <label className="detail-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Sparkles size={14} color="var(--accent-blue)" />
+                AI Risk Draft (Optional)
+              </label>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                <input
+                  className="form-control"
+                  placeholder="e.g. unauthorized change to database table..."
+                  value={rcmAiInput}
+                  onChange={e => setRcmAiInput(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleRcmAiGenerate}
+                  disabled={isRcmAiProcessing}
+                  style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  <Wand2 size={16} />
+                  {isRcmAiProcessing ? 'Thinking...' : 'Generate with AI'}
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateRcm}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', padding: '1.5rem' }}>
+                <div className="detail-item">
+                  <label className="detail-label">Industry</label>
+                  <select
+                    className="form-control"
+                    required
+                    value={newRcm.industry_id}
+                    onChange={e => setNewRcm({ ...newRcm, industry_id: e.target.value, sector_id: '', function_id: '' })}
+                  >
+                    <option value="">Select Industry...</option>
+                    {industries.map(i => <option key={i.industry_id} value={i.industry_id}>{i.industry_name}</option>)}
+                  </select>
+                </div>
+
+                <div className="detail-item">
+                  <label className="detail-label">Sector</label>
+                  <select
+                    className="form-control"
+                    required
+                    value={newRcm.sector_id}
+                    disabled={!newRcm.industry_id}
+                    onChange={e => setNewRcm({ ...newRcm, sector_id: e.target.value, function_id: '' })}
+                  >
+                    <option value="">Select Sector...</option>
+                    {allSectors.filter(s => s.industry_id === newRcm.industry_id).map(s => (
+                      <option key={s.sector_id} value={s.sector_id}>{s.sector_name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="detail-item">
+                  <label className="detail-label">Function</label>
+                  <select
+                    className="form-control"
+                    required
+                    value={newRcm.function_id}
+                    disabled={!newRcm.sector_id}
+                    onChange={e => setNewRcm({ ...newRcm, function_id: e.target.value })}
+                  >
+                    <option value="">Select Function...</option>
+                    {allFunctions.filter(f => f.sector_id === newRcm.sector_id).map(f => (
+                      <option key={f.function_id} value={f.function_id}>{f.function_name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="detail-item">
+                  <label className="detail-label">Risk Category</label>
+                  <select
+                    className="form-control"
+                    required
+                    value={newRcm.risk_category_id}
+                    onChange={e => setNewRcm({ ...newRcm, risk_category_id: e.target.value })}
+                  >
+                    <option value="">Select Risk Category...</option>
+                    {riskCats.map(c => <option key={c.risk_id} value={c.risk_id}>{c.category_name}</option>)}
+                  </select>
+                </div>
+
+                <div className="detail-item" style={{ gridColumn: 'span 2' }}>
+                  <label className="detail-label">Risk Description</label>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    required
+                    placeholder="Enter the risk scenario..."
+                    value={newRcm.risk_description}
+                    onChange={e => setNewRcm({ ...newRcm, risk_description: e.target.value })}
+                  />
+                </div>
+
+                <div className="detail-item" style={{ gridColumn: 'span 2' }}>
+                  <label className="detail-label">Control Description</label>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    required
+                    placeholder="Enter the mitigating control..."
+                    value={newRcm.control_description}
+                    onChange={e => setNewRcm({ ...newRcm, control_description: e.target.value })}
+                  />
+                </div>
+
+                <div className="detail-item">
+                  <label className="detail-label">Reference Standard</label>
+                  <input
+                    className="form-control"
+                    placeholder="e.g. ISO 27001, COBIT..."
+                    value={newRcm.reference_standard}
+                    onChange={e => setNewRcm({ ...newRcm, reference_standard: e.target.value })}
+                  />
+                </div>
+
+                <div className="detail-item">
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label className="detail-label">Control Type</label>
+                      <select
+                        className="form-control"
+                        value={newRcm.control_type}
+                        onChange={e => setNewRcm({ ...newRcm, control_type: e.target.value as any })}
+                      >
+                        <option value="Preventive">Preventive</option>
+                        <option value="Detective">Detective</option>
+                        <option value="Corrective">Corrective</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="detail-label">Frequency</label>
+                      <select
+                        className="form-control"
+                        value={newRcm.control_frequency}
+                        onChange={e => setNewRcm({ ...newRcm, control_frequency: e.target.value as any })}
+                      >
+                        <option value="Continuous">Continuous</option>
+                        <option value="Daily">Daily</option>
+                        <option value="Weekly">Weekly</option>
+                        <option value="Monthly">Monthly</option>
+                        <option value="Quarterly">Quarterly</option>
+                        <option value="Annual">Annual</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowNewRcmModal(false)} style={{ background: 'transparent', border: '1px solid var(--border-color)', color: '#fff', padding: '0.6rem 1.5rem', borderRadius: '0.5rem', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', padding: '0.6rem 2rem', borderRadius: '0.5rem', fontWeight: '600', cursor: 'pointer' }}>
+                  Create Control Entry
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -21,13 +21,13 @@ export type Database = {
           created_at: string
           criteria: string
           effect: string | null
+          evidence_json: Json | null
           evidence_urls: string[] | null
           observation_id: string
           procedure_id: string
           recommendation: string | null
           risk_rating: Database["public"]["Enums"]["risk_level"]
           title: string
-          evidence_json: { url: string, title: string }[] | null
         }
         Insert: {
           cause?: string | null
@@ -35,13 +35,13 @@ export type Database = {
           created_at?: string
           criteria: string
           effect?: string | null
+          evidence_json?: Json | null
           evidence_urls?: string[] | null
           observation_id?: string
           procedure_id: string
           recommendation?: string | null
           risk_rating: Database["public"]["Enums"]["risk_level"]
           title: string
-          evidence_json?: { url: string, title: string }[] | null
         }
         Update: {
           cause?: string | null
@@ -49,13 +49,13 @@ export type Database = {
           created_at?: string
           criteria?: string
           effect?: string | null
+          evidence_json?: Json | null
           evidence_urls?: string[] | null
           observation_id?: string
           procedure_id?: string
           recommendation?: string | null
           risk_rating?: Database["public"]["Enums"]["risk_level"]
           title?: string
-          evidence_json?: { url: string, title: string }[] | null
         }
         Relationships: [
           {
@@ -101,35 +101,91 @@ export type Database = {
       }
       framework_mapping: {
         Row: {
-          category_id: string
           created_at: string
           framework_name: string
           mapping_id: string
           reference_code: string
+          reference_description: string | null
+          risk_id: string
         }
         Insert: {
-          category_id: string
           created_at?: string
           framework_name: string
           mapping_id?: string
           reference_code: string
+          reference_description?: string | null
+          risk_id: string
         }
         Update: {
-          category_id?: string
           created_at?: string
           framework_name?: string
           mapping_id?: string
           reference_code?: string
+          reference_description?: string | null
+          risk_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "framework_mapping_category_id_fkey"
-            columns: ["category_id"]
+            foreignKeyName: "framework_mapping_risk_id_fkey"
+            columns: ["risk_id"]
             isOneToOne: false
             referencedRelation: "risk_categories"
-            referencedColumns: ["category_id"]
+            referencedColumns: ["risk_id"]
           },
         ]
+      }
+      functions: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          function_id: string
+          function_name: string
+          sector_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          function_id?: string
+          function_name: string
+          sector_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          function_id?: string
+          function_name?: string
+          sector_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "functions_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["sector_id"]
+          },
+        ]
+      }
+      industries: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          industry_id: string
+          industry_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          industry_id?: string
+          industry_name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          industry_id?: string
+          industry_name?: string
+        }
+        Relationships: []
       }
       management_responses: {
         Row: {
@@ -231,24 +287,136 @@ export type Database = {
       }
       risk_categories: {
         Row: {
-          category_id: string
           category_name: string
           created_at: string
           description: string | null
+          risk_id: string
         }
         Insert: {
-          category_id?: string
           category_name: string
           created_at?: string
           description?: string | null
+          risk_id?: string
         }
         Update: {
-          category_id?: string
           category_name?: string
           created_at?: string
           description?: string | null
+          risk_id?: string
         }
         Relationships: []
+      }
+      risk_control_matrix: {
+        Row: {
+          control_description: string
+          control_frequency:
+          | Database["public"]["Enums"]["control_frequency"]
+          | null
+          control_type: Database["public"]["Enums"]["control_type"] | null
+          created_at: string | null
+          function_id: string | null
+          industry_id: string | null
+          rcm_id: string
+          reference_standard: string | null
+          risk_category_id: string | null
+          risk_description: string
+          sector_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          control_description: string
+          control_frequency?:
+          | Database["public"]["Enums"]["control_frequency"]
+          | null
+          control_type?: Database["public"]["Enums"]["control_type"] | null
+          created_at?: string | null
+          function_id?: string | null
+          industry_id?: string | null
+          rcm_id?: string
+          reference_standard?: string | null
+          risk_category_id?: string | null
+          risk_description: string
+          sector_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          control_description?: string
+          control_frequency?:
+          | Database["public"]["Enums"]["control_frequency"]
+          | null
+          control_type?: Database["public"]["Enums"]["control_type"] | null
+          created_at?: string | null
+          function_id?: string | null
+          industry_id?: string | null
+          rcm_id?: string
+          reference_standard?: string | null
+          risk_category_id?: string | null
+          risk_description?: string
+          sector_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_control_matrix_function_id_fkey"
+            columns: ["function_id"]
+            isOneToOne: false
+            referencedRelation: "functions"
+            referencedColumns: ["function_id"]
+          },
+          {
+            foreignKeyName: "risk_control_matrix_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["industry_id"]
+          },
+          {
+            foreignKeyName: "risk_control_matrix_risk_category_id_fkey"
+            columns: ["risk_category_id"]
+            isOneToOne: false
+            referencedRelation: "risk_categories"
+            referencedColumns: ["risk_id"]
+          },
+          {
+            foreignKeyName: "risk_control_matrix_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["sector_id"]
+          },
+        ]
+      }
+      sectors: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          industry_id: string | null
+          sector_id: string
+          sector_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          industry_id?: string | null
+          sector_id?: string
+          sector_name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          industry_id?: string | null
+          sector_id?: string
+          sector_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sectors_industry_id_fkey"
+            columns: ["industry_id"]
+            isOneToOne: false
+            referencedRelation: "industries"
+            referencedColumns: ["industry_id"]
+          },
+        ]
       }
     }
     Views: {
@@ -258,6 +426,14 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      control_frequency:
+      | "Continuous"
+      | "Daily"
+      | "Weekly"
+      | "Monthly"
+      | "Quarterly"
+      | "Annual"
+      control_type: "Preventive" | "Detective" | "Corrective"
       risk_level: "Low" | "Medium" | "High" | "Critical"
       user_role: "auditor" | "manager" | "client"
     }
@@ -267,13 +443,17 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals["public"]
 
 export type Tables<
   PublicTableNameOrOptions extends
-  | keyof (DatabaseWithoutInternals["public"]["Tables"] & DatabaseWithoutInternals["public"]["Views"])
+  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
   | { schema: keyof DatabaseWithoutInternals },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+  TableName extends PublicTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
   ? keyof (DatabaseWithoutInternals[PublicTableNameOrOptions["schema"]]["Tables"] &
     DatabaseWithoutInternals[PublicTableNameOrOptions["schema"]]["Views"])
   : never = never,
@@ -284,10 +464,10 @@ export type Tables<
     }
   ? R
   : never
-  : PublicTableNameOrOptions extends keyof (DatabaseWithoutInternals["public"]["Tables"] &
-    DatabaseWithoutInternals["public"]["Views"])
-  ? (DatabaseWithoutInternals["public"]["Tables"] &
-    DatabaseWithoutInternals["public"]["Views"])[PublicTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])[PublicTableNameOrOptions] extends {
       Row: infer R
     }
   ? R
@@ -296,9 +476,11 @@ export type Tables<
 
 export type TablesInsert<
   PublicTableNameOrOptions extends
-  | keyof DatabaseWithoutInternals["public"]["Tables"]
+  | keyof DefaultSchema["Tables"]
   | { schema: keyof DatabaseWithoutInternals },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+  TableName extends PublicTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
   ? keyof DatabaseWithoutInternals[PublicTableNameOrOptions["schema"]]["Tables"]
   : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
@@ -307,8 +489,8 @@ export type TablesInsert<
   }
   ? I
   : never
-  : PublicTableNameOrOptions extends keyof DatabaseWithoutInternals["public"]["Tables"]
-  ? DatabaseWithoutInternals["public"]["Tables"][PublicTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof DefaultSchema["Tables"]
+  ? DefaultSchema["Tables"][PublicTableNameOrOptions] extends {
     Insert: infer I
   }
   ? I
@@ -317,9 +499,11 @@ export type TablesInsert<
 
 export type TablesUpdate<
   PublicTableNameOrOptions extends
-  | keyof DatabaseWithoutInternals["public"]["Tables"]
+  | keyof DefaultSchema["Tables"]
   | { schema: keyof DatabaseWithoutInternals },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
+  TableName extends PublicTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
   ? keyof DatabaseWithoutInternals[PublicTableNameOrOptions["schema"]]["Tables"]
   : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
@@ -328,8 +512,8 @@ export type TablesUpdate<
   }
   ? U
   : never
-  : PublicTableNameOrOptions extends keyof DatabaseWithoutInternals["public"]["Tables"]
-  ? DatabaseWithoutInternals["public"]["Tables"][PublicTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof DefaultSchema["Tables"]
+  ? DefaultSchema["Tables"][PublicTableNameOrOptions] extends {
     Update: infer U
   }
   ? U
@@ -337,14 +521,53 @@ export type TablesUpdate<
   : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends
-  | keyof DatabaseWithoutInternals["public"]["Enums"]
+  DefaultSchemaEnumNameOrOptions extends
+  | keyof DefaultSchema["Enums"]
   | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
-  ? keyof DatabaseWithoutInternals[PublicEnumNameOrOptions["schema"]]["Enums"]
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
   : never = never,
-> = PublicEnumNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
-  ? DatabaseWithoutInternals[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof DatabaseWithoutInternals["public"]["Enums"]
-  ? DatabaseWithoutInternals["public"]["Enums"][PublicEnumNameOrOptions]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
   : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+  | keyof DefaultSchema["CompositeTypes"]
+  | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+  : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      control_frequency: [
+        "Continuous",
+        "Daily",
+        "Weekly",
+        "Monthly",
+        "Quarterly",
+        "Annual",
+      ],
+      control_type: ["Preventive", "Detective", "Corrective"],
+      risk_level: ["Low", "Medium", "High", "Critical"],
+      user_role: ["auditor", "manager", "client"],
+    },
+  },
+} as const
