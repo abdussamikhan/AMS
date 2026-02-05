@@ -354,6 +354,12 @@ select.form-control {
   cursor: pointer;
 }
 
+.form-control-sm {
+  padding: 0 0.75rem !important;
+  height: 38px !important;
+  font-size: 0.85rem !important;
+}
+
 /* This is the key fix for the dropdown options contrast */
 select.form-control option {
   background-color: #1a1f26;

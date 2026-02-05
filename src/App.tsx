@@ -34,7 +34,13 @@ import {
   Layers,
   Shield,
   Users,
-  TrendingUp
+  TrendingUp,
+  ChevronDown,
+  Settings,
+  Database as DatabaseIcon,
+  Layout,
+  Edit3,
+  Trash2
 } from 'lucide-react'
 import {
   BarChart,
@@ -75,6 +81,35 @@ type RCMEntry = Database['public']['Tables']['risk_control_matrix']['Row'] & {
   risk_categories?: { category_name: string }
 }
 
+type RiskRegisterEntry = {
+  id: string
+  rcm_id: string | null
+  risk_title: string
+  risk_description: string
+  risk_category_id: string
+  inherent_likelihood: number
+  inherent_impact: number
+  inherent_score: number
+  residual_likelihood: number
+  residual_impact: number
+  residual_score: number
+  risk_owner: string
+  mitigation_strategy: 'Accept' | 'Mitigate' | 'Transfer' | 'Avoid'
+  action_plan: string
+  status: 'Open' | 'In Progress' | 'Mitigated' | 'Closed'
+  fiscal_year: number
+  created_by: string
+  created_at: string
+  updated_at: string
+  risk_control_matrix?: {
+    control_description: string
+    control_frequency: string
+  }
+  risk_categories?: {
+    category_name: string
+  }
+}
+
 function App() {
   const [isAppLoading, setIsAppLoading] = useState(true)
   const [isAuthLoading, setIsAuthLoading] = useState(false)
@@ -90,7 +125,12 @@ function App() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
   const [selectedRole, setSelectedRole] = useState<'auditor' | 'manager' | 'client'>('manager')
   const [observations, setObservations] = useState<Observation[]>([])
-  const [activeView, setActiveView] = useState('overview')
+  const [activeView, setActiveView] = useState<string>('overview')
+  const [isAdminExpanded, setIsAdminExpanded] = useState(false)
+  const [isEditingRcm, setIsEditingRcm] = useState(false)
+  const [currentRcmId, setCurrentRcmId] = useState<string | null>(null)
+  const [isEditingObs, setIsEditingObs] = useState(false)
+  const [currentObsId, setCurrentObsId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedObs, setSelectedObs] = useState<Observation | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
@@ -126,8 +166,33 @@ function App() {
   const [allFunctions, setAllFunctions] = useState<any[]>([])
   const [allDepartments, setAllDepartments] = useState<any[]>([])
   const [riskCats, setRiskCats] = useState<any[]>([])
-  const [rcmFilters, setRcmFilters] = useState({ industry: 'all', function: 'all', department: 'all', search: '' })
+  const [rcmFilters, setRcmFilters] = useState({ industry: 'all', function: 'all', department: 'all', category: 'all', frequency: 'all', search: '' })
   const [showNewRcmModal, setShowNewRcmModal] = useState(false)
+  const [refDocs, setRefDocs] = useState<any[]>([])
+  const [refFilters, setRefFilters] = useState({ category: 'all', search: '' })
+  const [riskRegisterEntries, setRiskRegisterEntries] = useState<RiskRegisterEntry[]>([])
+  const [riskRegisterFilters, setRiskRegisterFilters] = useState({ category: 'all', status: 'all', year: new Date().getFullYear().toString(), search: '' })
+  const [showNewRiskModal, setShowNewRiskModal] = useState(false)
+  const [isEditingRisk, setIsEditingRisk] = useState(false)
+  const [currentRiskId, setCurrentRiskId] = useState<string | null>(null)
+  const [newRiskEntry, setNewRiskEntry] = useState<Partial<RiskRegisterEntry>>({
+    risk_title: '',
+    risk_description: '',
+    risk_category_id: '',
+    inherent_likelihood: 3,
+    inherent_impact: 3,
+    residual_likelihood: 2,
+    residual_impact: 2,
+    risk_owner: '',
+    mitigation_strategy: 'Mitigate',
+    action_plan: '',
+    status: 'Open',
+    fiscal_year: new Date().getFullYear(),
+    rcm_id: null
+  })
+  const [isRefUploading, setIsRefUploading] = useState(false)
+  const [showRefUploadModal, setShowRefUploadModal] = useState(false)
+  const [newRefDoc, setNewRefDoc] = useState({ title: '', category: 'Standard' })
   const [newRcm, setNewRcm] = useState({
     industry_id: '',
     function_id: '',
@@ -198,6 +263,7 @@ function App() {
         fetchRcmContext()
         fetchAuditPlanningData()
         fetchAuditors()
+        fetchRefDocs()
       }
       else setProfile(null)
       setIsAppLoading(false)
@@ -205,6 +271,19 @@ function App() {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  async function fetchRefDocs() {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('reference_documents')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setRefDocs(data || [])
+    } catch (err) {
+      console.error('Error fetching reference docs:', err)
+    }
+  }
 
   async function fetchAuditPlanningData() {
     try {
@@ -302,10 +381,73 @@ function App() {
         industry: 'all',
         function: 'all',
         department: 'all',
+        category: 'all',
+        frequency: 'all',
         search: ''
       })
     } catch (err) {
       console.error('Error fetching RCM context:', err)
+    }
+  }
+
+  const openEditRcmModal = (entry: any) => {
+    setNewRcm({
+      industry_id: entry.industry_id || '',
+      function_id: entry.function_id || '',
+      department_id: entry.department_id || '',
+      risk_category_id: entry.risk_category_id || '',
+      risk_description: entry.risk_description || '',
+      control_description: entry.control_description || '',
+      reference_standard: entry.reference_standard || '',
+      control_type: entry.control_type || 'Preventive',
+      control_frequency: entry.control_frequency || 'Continuous'
+    })
+    setCurrentRcmId(entry.rcm_id)
+    setIsCustomFunctionRcm(false)
+    setIsCustomDepartmentRcm(false)
+    setCustomFunctionRcm('')
+    setCustomDepartmentRcm('')
+    setIsEditingRcm(true)
+    setShowNewRcmModal(true)
+  }
+
+  const handleDeleteRcm = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this RCM entry?')) return
+    try {
+      const { error } = await supabase.from('risk_control_matrix').delete().eq('rcm_id', id)
+      if (error) throw error
+      fetchRcmData()
+    } catch (err: any) {
+      alert('Error deleting RCM: ' + err.message)
+    }
+  }
+
+  const openEditObsModal = (obs: Observation) => {
+    setNewObs({
+      procedure_id: obs.procedure_id,
+      condition: obs.condition,
+      criteria: obs.criteria,
+      cause: obs.cause || '',
+      effect: obs.effect || '',
+      recommendation: obs.recommendation || '',
+      risk_rating: obs.risk_rating,
+      title: obs.title || '',
+      audit_id: obs.audit_id || ''
+    })
+    setUploadedAttachments(obs.evidence_json as any || [])
+    setCurrentObsId(obs.observation_id)
+    setIsEditingObs(true)
+    setShowNewModal(true)
+  }
+
+  const handleDeleteObs = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this finding?')) return
+    try {
+      const { error } = await supabase.from('audit_observations').delete().eq('observation_id', id)
+      if (error) throw error
+      fetchData()
+    } catch (err: any) {
+      alert('Error deleting finding: ' + err.message)
     }
   }
 
@@ -354,8 +496,16 @@ function App() {
         department_id: departmentId
       }
 
-      const { error } = await supabase.from('risk_control_matrix').insert([submission])
-      if (error) throw error
+      if (isEditingRcm && currentRcmId) {
+        const { error } = await supabase
+          .from('risk_control_matrix')
+          .update(submission)
+          .eq('rcm_id', currentRcmId)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('risk_control_matrix').insert([submission])
+        if (error) throw error
+      }
 
       setShowNewRcmModal(false)
       fetchRcmData()
@@ -377,11 +527,72 @@ function App() {
       setIsCustomDepartmentRcm(false)
       setCustomFunctionRcm('')
       setCustomDepartmentRcm('')
+      setIsEditingRcm(false)
+      setCurrentRcmId(null)
 
     } catch (err: any) {
       alert(err.message)
     }
   }
+
+  const handleSaveRisk = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRiskEntry.risk_title || !newRiskEntry.risk_category_id) {
+      alert('Risk Title and Category are required');
+      return;
+    }
+
+    try {
+      const inherent_score = (newRiskEntry.inherent_likelihood || 0) * (newRiskEntry.inherent_impact || 0);
+      const residual_score = (newRiskEntry.residual_likelihood || 0) * (newRiskEntry.residual_impact || 0);
+
+      const riskData: any = {
+        ...newRiskEntry,
+        inherent_score,
+        residual_score,
+        created_by: session.user.id,
+        updated_at: new Date().toISOString()
+      };
+
+      // Remove relations before saving
+      delete riskData.risk_control_matrix;
+      delete riskData.risk_categories;
+
+      if (isEditingRisk && currentRiskId) {
+        const { error } = await supabase
+          .from('risk_register' as any)
+          .update(riskData)
+          .eq('id', currentRiskId);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('risk_register' as any)
+          .insert([riskData]);
+
+        if (error) throw error;
+      }
+
+      setShowNewRiskModal(false);
+      fetchRiskRegister();
+    } catch (err: any) {
+      alert('Error saving risk: ' + err.message);
+    }
+  };
+
+  const handleDeleteRisk = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this risk assessment?')) return;
+    try {
+      const { error } = await supabase
+        .from('risk_register' as any)
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      fetchRiskRegister();
+    } catch (err: any) {
+      alert('Error deleting risk: ' + err.message);
+    }
+  };
 
   const handleRcmAiGenerate = async () => {
     if (!rcmAiInput.trim()) return
@@ -548,6 +759,29 @@ function App() {
     if (data) setProcedures(data)
   }
 
+  async function fetchRiskRegister() {
+    const { data, error } = await supabase
+      .from('risk_register' as any)
+      .select(`
+        *,
+        risk_control_matrix (
+          control_description,
+          control_frequency
+        ),
+        risk_categories (
+          category_name
+        )
+      `)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching risk register:', error)
+      return
+    }
+
+    if (data) setRiskRegisterEntries(data as any[])
+  }
+
   async function fetchData() {
     try {
       setIsDataLoading(true)
@@ -586,7 +820,12 @@ function App() {
         high: counts.high,
         medium: counts.medium
       })
-    } catch (error) {
+
+      fetchRcmData()
+      fetchRefDocs()
+      fetchAuditPlanningData()
+      fetchRiskRegister()
+    } catch (error: any) {
       console.error('Error fetching data:', error)
     } finally {
       setIsDataLoading(false)
@@ -625,7 +864,7 @@ function App() {
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
     link.setAttribute("href", url)
-    link.setAttribute("download", `AMS_Audit_Report_${new Date().toISOString().split('T')[0]}.csv`)
+    link.setAttribute("download", `AuditAce_Audit_Report_${new Date().toISOString().split('T')[0]}.csv`)
     link.style.visibility = 'hidden'
     document.body.appendChild(link)
     link.click()
@@ -701,10 +940,10 @@ function App() {
       doc.setPage(i)
       doc.setFontSize(8)
       doc.setTextColor(150)
-      doc.text(`Page ${i} of ${pageCount} - Confidential AMS Internal Report`, 14, 200) // Adjusted for landscape
+      doc.text(`Page ${i} of ${pageCount} - Confidential AuditAce Internal Report`, 14, 200) // Adjusted for landscape
     }
 
-    doc.save(`AMS_Audit_Report_${new Date().toISOString().split('T')[0]}.pdf`)
+    doc.save(`AuditAce_Audit_Report_${new Date().toISOString().split('T')[0]}.pdf`)
   }
 
   const generateDetailedPDF = (obs: Observation) => {
@@ -714,7 +953,7 @@ function App() {
     // Title & Header
     doc.setFontSize(22)
     doc.setTextColor(41, 128, 185)
-    doc.text('AMS: Detailed Finding Report', 14, 22)
+    doc.text('AuditAce: Detailed Finding Report', 14, 22)
 
     doc.setFontSize(10)
     doc.setTextColor(100)
@@ -814,10 +1053,10 @@ function App() {
       doc.setPage(i)
       doc.setFontSize(8)
       doc.setTextColor(150)
-      doc.text(`Page ${i} of ${pageCount} - AMS Detailed Audit Report - ${obs.observation_id}`, 14, 285)
+      doc.text(`Page ${i} of ${pageCount} - AuditAce Detailed Audit Report - ${obs.observation_id}`, 14, 285)
     }
 
-    doc.save(`AMS_Detailed_Finding_${obs.observation_id.slice(0, 8)}.pdf`)
+    doc.save(`AuditAce_Detailed_Finding_${obs.observation_id.slice(0, 8)}.pdf`)
   }
 
   const handleMgmtSubmit = async (e: React.FormEvent) => {
@@ -955,6 +1194,81 @@ function App() {
     return acc
   }, [])
 
+  const handleRefUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!newRefDoc.title.trim()) {
+      alert('Please enter a title for the document.')
+      return
+    }
+
+    try {
+      setIsRefUploading(true)
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random()}.${fileExt}`
+      const filePath = `references/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('audit-evidence') // Use existing bucket, organizing by folder
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('audit-evidence')
+        .getPublicUrl(filePath)
+
+      const { error: dbError } = await (supabase as any)
+        .from('reference_documents')
+        .insert([{
+          title: newRefDoc.title,
+          category: newRefDoc.category,
+          file_url: publicUrl,
+          file_path: filePath,
+          file_size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+          file_type: file.type,
+          uploaded_by: session?.user?.id
+        }])
+
+      if (dbError) throw dbError
+
+      alert('Document uploaded successfully!')
+      setShowRefUploadModal(false)
+      setNewRefDoc({ title: '', category: 'Standard' })
+      fetchRefDocs()
+    } catch (err: any) {
+      alert('Error uploading document: ' + err.message)
+    } finally {
+      setIsRefUploading(false)
+    }
+  }
+
+  const handleDeleteRef = async (doc: any) => {
+    if (!confirm(`Are you sure you want to delete "${doc.title}"?`)) return
+
+    try {
+      // 1. Delete from Storage
+      const { error: storageError } = await supabase.storage
+        .from('audit-evidence')
+        .remove([doc.file_path])
+
+      if (storageError) throw storageError
+
+      // 2. Delete from Database
+      const { error: dbError } = await (supabase as any)
+        .from('reference_documents')
+        .delete()
+        .eq('id', doc.id)
+
+      if (dbError) throw dbError
+
+      alert('Document deleted successfully')
+      fetchRefDocs()
+    } catch (err: any) {
+      alert('Error deleting document: ' + err.message)
+    }
+  }
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
@@ -999,7 +1313,7 @@ function App() {
     return (
       <div className="auth-container">
         <div style={{ textAlign: 'center' }}>
-          <div className="logo" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>AMS Dashboard</div>
+          <div className="logo" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>AuditAce</div>
           <div style={{ color: 'var(--text-secondary)' }}>Initializing Secure Session...</div>
         </div>
       </div>
@@ -1011,7 +1325,7 @@ function App() {
       <div className="auth-container">
         <div className="auth-card fade-in">
           <div className="auth-header">
-            <div className="logo" style={{ marginBottom: '0.5rem' }}>AMS Dashboard</div>
+            <div className="logo" style={{ marginBottom: '0.5rem' }}>AuditAce</div>
             <h2>{authMode === 'login' ? 'Welcome Back' : 'Create Account'}</h2>
             <p style={{ color: 'var(--text-secondary)' }}>
               {authMode === 'login' ? 'Enter your credentials to access the system' : 'Sign up to start managing audit findings'}
@@ -1111,7 +1425,7 @@ function App() {
   return (
     <div className="app-container">
       <aside className="sidebar">
-        <div className="logo">AMS Dashboard</div>
+        <div className="logo">AuditAce</div>
         <nav className="nav-links">
           <div
             className={`nav-link ${activeView === 'overview' ? 'active' : ''}`}
@@ -1125,7 +1439,7 @@ function App() {
             onClick={() => setActiveView('findings')}
           >
             <CheckCircle2 />
-            Control Findings
+            Audit Observations
           </div>
           <div
             className={`nav-link ${activeView === 'rcm' ? 'active' : ''}`}
@@ -1134,7 +1448,10 @@ function App() {
             <Grid />
             Risk Control Matrix
           </div>
-          <div className="nav-link">
+          <div
+            className={`nav-link ${activeView === 'risk-register' ? 'active' : ''}`}
+            onClick={() => setActiveView('risk-register')}
+          >
             <ShieldAlert />
             Risk Register
           </div>
@@ -1157,13 +1474,48 @@ function App() {
             Data Analytics
           </div>
           {profile?.role === 'admin' && (
-            <div
-              className={`nav-link ${activeView === 'admin' ? 'active' : ''}`}
-              onClick={() => setActiveView('admin')}
-            >
-              <Shield />
-              Admin
-            </div>
+            <>
+              <div
+                className={`nav-link ${activeView.startsWith('admin') ? 'active' : ''}`}
+                onClick={() => setIsAdminExpanded(!isAdminExpanded)}
+                style={{ justifyContent: 'space-between', cursor: 'pointer' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <Shield />
+                  Admin
+                </div>
+                {isAdminExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </div>
+
+              {isAdminExpanded && (
+                <div style={{ marginLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <div
+                    className={`nav-link ${activeView === 'admin-setup' ? 'active' : ''}`}
+                    onClick={() => setActiveView('admin-setup')}
+                    style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}
+                  >
+                    <Settings size={16} />
+                    Setup
+                  </div>
+                  <div
+                    className={`nav-link ${activeView === 'admin-references' ? 'active' : ''}`}
+                    onClick={() => setActiveView('admin-references')}
+                    style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}
+                  >
+                    <DatabaseIcon size={16} />
+                    References
+                  </div>
+                  <div
+                    className={`nav-link ${activeView === 'admin-templates' ? 'active' : ''}`}
+                    onClick={() => setActiveView('admin-templates')}
+                    style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}
+                  >
+                    <Layout size={16} />
+                    Templates
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </nav>
 
@@ -1180,28 +1532,37 @@ function App() {
       </aside>
 
       <main className="main-content">
-        <header className="header" style={{ marginBottom: activeView === 'findings' ? '2rem' : '3rem' }}>
+        <header className="header" style={{ marginBottom: (activeView === 'findings' || activeView === 'risk-register') ? '2rem' : '3rem' }}>
           <div>
             <h1>
               {activeView === 'overview' ? 'Audit Overview'
                 : activeView === 'rcm' ? 'Risk Control Matrix'
                   : activeView === 'audit-planning' ? 'Audit Planning'
-                    : activeView === 'analytics' ? 'Data Analytics'
-                      : activeView === 'admin' ? 'Admin Dashboard'
-                        : 'Control Findings'}
+                    : activeView === 'risk-register' ? 'Risk Register'
+                      : activeView === 'analytics' ? 'Data Analytics'
+                        : activeView === 'admin-setup' ? 'Organization Setup'
+                          : activeView === 'admin-references' ? 'Reference Documents'
+                            : activeView === 'admin-templates' ? 'Audit Templates'
+                              : 'Audit Observations'}
             </h1>
             <p style={{ color: 'var(--text-secondary)' }}>
               {activeView === 'overview'
                 ? 'High-level risk distribution and analytics'
                 : activeView === 'rcm'
                   ? 'Map risks to internal controls across the organization'
-                  : activeView === 'audit-planning'
-                    ? 'Manage annual audit plans and schedule engagements'
-                    : activeView === 'analytics'
-                      ? 'Advanced insights and trends across audit findings and controls'
-                      : activeView === 'admin'
-                        ? 'System administration and configuration'
-                        : 'Detailed list of organizational audit observations'}
+                  : activeView === 'risk-register'
+                    ? 'Identify, assess, and monitor organizational risks'
+                    : activeView === 'audit-planning'
+                      ? 'Manage annual audit plans and schedule engagements'
+                      : activeView === 'analytics'
+                        ? 'Advanced insights and trends across audit observations and controls'
+                        : activeView === 'admin-setup'
+                          ? 'Manage industries, functions, and departments'
+                          : activeView === 'admin-references'
+                            ? 'Upload and manage reference documents, standards, and policies'
+                            : activeView === 'admin-templates'
+                              ? 'Upload and manage audit report templates'
+                              : 'Detailed list of organizational audit observations'}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
@@ -1288,6 +1649,7 @@ function App() {
                 </div>
               )}
             </div>
+
             {activeView === 'findings' && (
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <div style={{
@@ -1336,6 +1698,53 @@ function App() {
                     New Finding
                   </button>
                 )}
+              </div>
+            )}
+
+            {activeView === 'risk-register' && (profile?.role === 'auditor' || profile?.role === 'manager') && (
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button
+                  onClick={() => {
+                    setIsEditingRisk(false);
+                    setCurrentRiskId(null);
+                    setNewRiskEntry({
+                      risk_title: '',
+                      risk_description: '',
+                      risk_category_id: '',
+                      inherent_likelihood: 3,
+                      inherent_impact: 3,
+                      residual_likelihood: 2,
+                      residual_impact: 2,
+                      risk_owner: '',
+                      mitigation_strategy: 'Mitigate',
+                      action_plan: '',
+                      status: 'Open',
+                      fiscal_year: new Date().getFullYear(),
+                      rcm_id: null
+                    });
+                    setShowNewRiskModal(true);
+                  }}
+                  style={{
+                    background: 'var(--accent-blue)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  <Plus size={18} />
+                  New Risk
+                </button>
+              </div>
+            )}
+
+            {(activeView === 'findings' || activeView === 'risk-register') && (
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button
                   onClick={downloadCSV}
                   style={{
@@ -1394,7 +1803,7 @@ function App() {
               </div>
             )}
           </div>
-        </header >
+        </header>
 
         {activeView === 'overview' ? (
           <>
@@ -1783,9 +2192,9 @@ function App() {
                 <div style={{ marginBottom: '1.5rem' }}>
                   <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <ShieldAlert size={18} color="var(--accent-red)" />
-                    Findings Trend by Severity
+                    Observations Trend by Severity
                   </h3>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Monthly findings breakdown</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Monthly observations breakdown</p>
                 </div>
                 <div style={{ height: '300px' }}>
                   <ResponsiveContainer width="100%" height="100%">
@@ -1812,50 +2221,9 @@ function App() {
               </section>
             </div>
           </div>
-        ) : activeView === 'admin' ? (
+        ) : activeView === 'admin-setup' ? (
           <div className="admin-view">
-            <h1 style={{ fontSize: '1.75rem', fontWeight: '700', marginBottom: '2rem' }}>Admin Dashboard</h1>
-
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
-              {/* Audit Template Upload */}
-              <div style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', padding: '1.5rem' }}>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                  <FileText size={20} color="var(--accent-blue)" /> Audit Report Templates
-                </h3>
-                <div style={{ background: 'var(--bg-dark)', borderRadius: '0.75rem', border: '1px dashed var(--border-color)', padding: '2rem', textAlign: 'center' }}>
-                  <Upload size={48} color="var(--text-secondary)" style={{ marginBottom: '1rem', opacity: 0.5 }} />
-                  <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-                    Upload PDF templates here. The AI will use these to generate structured audit reports.
-                  </p>
-                  <label className="btn btn-primary" style={{ display: 'inline-flex', cursor: 'pointer' }}>
-                    {isTemplateUploading ? 'Uploading...' : 'Upload Template'}
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      style={{ display: 'none' }}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        setIsTemplateUploading(true)
-                        try {
-                          const fileExt = file.name.split('.').pop()
-                          const fileName = `${Math.random()}.${fileExt}`
-                          const { error } = await supabase.storage
-                            .from('audit-templates')
-                            .upload(fileName, file)
-                          if (error) throw error
-                          alert('Template uploaded successfully!')
-                        } catch (err: any) {
-                          alert('Error uploading template: ' + err.message)
-                        } finally {
-                          setIsTemplateUploading(false)
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
-
               {/* Industry Management */}
               <div style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', padding: '1.5rem' }}>
                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
@@ -2011,6 +2379,154 @@ function App() {
               </div>
             </div>
           </div>
+        ) : activeView === 'admin-references' ? (
+          <div className="admin-view">
+            <div style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', padding: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem' }}>Reference Documents Library</h2>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Standards, Regulations, Policies, and Procedures</p>
+                </div>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowRefUploadModal(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  <Plus size={18} /> Upload Reference
+                </button>
+              </div>
+
+              {/* Filter Bar */}
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+                <div style={{ background: 'var(--glass-bg)', borderRadius: '0.75rem', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', padding: '0 1rem', height: '42px', flex: 1 }}>
+                  <Search size={18} color="var(--text-secondary)" style={{ minWidth: '18px' }} />
+                  <input
+                    type="text"
+                    placeholder="Search documents by title..."
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      boxShadow: 'none',
+                      flex: 1,
+                      minWidth: 0,
+                      marginLeft: '0.5rem',
+                      height: '100%',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.95rem',
+                      outline: 'none'
+                    }}
+                    value={refFilters.search}
+                    onChange={e => setRefFilters({ ...refFilters, search: e.target.value })}
+                  />
+                </div>
+                <select
+                  className="form-control"
+                  style={{ width: '200px', cursor: 'pointer' }}
+                  value={refFilters.category}
+                  onChange={e => setRefFilters({ ...refFilters, category: e.target.value })}
+                >
+                  <option value="all">All Categories</option>
+                  <option value="Standard">Standard</option>
+                  <option value="Regulation">Regulation</option>
+                  <option value="Policy">Policy</option>
+                  <option value="Procedure">Procedure</option>
+                  <option value="Manual">Manual</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              {refDocs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '4rem', background: 'rgba(255,255,255,0.02)', borderRadius: '1rem', border: '1px dashed var(--border-color)' }}>
+                  <DatabaseIcon size={40} color="var(--text-secondary)" style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                  <p style={{ color: 'var(--text-secondary)' }}>No reference documents uploaded yet.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                  {refDocs
+                    .filter(doc => {
+                      const matchesSearch = doc.title?.toLowerCase().includes(refFilters.search.toLowerCase())
+                      const matchesCategory = refFilters.category === 'all' || doc.category === refFilters.category
+                      return matchesSearch && matchesCategory
+                    })
+                    .map((doc, idx) => (
+                      <div key={doc.id || idx} className="doc-card" style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '1rem', border: '1px solid var(--border-color)', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '0.5rem', borderRadius: '0.5rem' }}>
+                            <FileText size={20} color="var(--accent-blue)" />
+                          </div>
+                          <span className="badge badge-low" style={{ fontSize: '0.7rem' }}>{doc.category}</span>
+                        </div>
+                        <div>
+                          <h4 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '0.25rem' }}>{doc.title}</h4>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            Uploaded: {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : '---'} • {doc.file_size}
+                          </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                          <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ flex: 1, fontSize: '0.8rem', padding: '0.4rem', textDecoration: 'none', textAlign: 'center' }}>View</a>
+                          <a href={doc.file_url} download className="btn btn-secondary" style={{ padding: '0.4rem' }}><Download size={14} /></a>
+                          {profile?.role === 'admin' && (
+                            <button
+                              className="btn btn-secondary"
+                              onClick={() => handleDeleteRef(doc)}
+                              style={{ padding: '0.4rem', color: 'var(--error)' }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : activeView === 'admin-templates' ? (
+          <div className="admin-view">
+            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+              {/* Audit Template Upload */}
+              <div style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', padding: '2rem' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                  <FileText size={20} color="var(--accent-blue)" /> Audit Report Templates
+                </h3>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '0.95rem' }}>
+                  Manage the structured templates used by AI to generate audit reports. Uploading a new template will update the logic used for future reports.
+                </p>
+                <div style={{ background: 'var(--bg-dark)', borderRadius: '1rem', border: '1px dashed var(--border-color)', padding: '3rem', textAlign: 'center' }}>
+                  <Upload size={48} color="var(--text-secondary)" style={{ marginBottom: '1.5rem', opacity: 0.5 }} />
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+                    Upload PDF templates here (Max 10MB)
+                  </p>
+                  <label className="btn btn-primary" style={{ display: 'inline-flex', cursor: 'pointer', padding: '0.75rem 2rem' }}>
+                    {isTemplateUploading ? 'Uploading...' : 'Upload New Template'}
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      style={{ display: 'none' }}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        setIsTemplateUploading(true)
+                        try {
+                          const fileExt = file.name.split('.').pop()
+                          const fileName = `${Math.random()}.${fileExt}`
+                          const { error } = await supabase.storage
+                            .from('audit-templates')
+                            .upload(fileName, file)
+                          if (error) throw error
+                          alert('Template uploaded successfully!')
+                        } catch (err: any) {
+                          alert('Error uploading template: ' + err.message)
+                        } finally {
+                          setIsTemplateUploading(false)
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
         ) : activeView === 'audit-planning' ? (
           <div className="audit-planning-view">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -2087,22 +2603,22 @@ function App() {
             {/* Filters Section */}
             {/* Filters Section */}
             {/* Filters Section */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 1fr) 180px 180px 180px auto', gap: '1rem', marginBottom: '1.5rem', alignItems: 'center' }}>
-              <div style={{ background: 'var(--glass-bg)', borderRadius: '0.75rem', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', padding: '0 1rem', height: '42px' }}>
-                <Search size={18} color="var(--text-secondary)" style={{ minWidth: '18px' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) 140px 140px 140px 140px 140px auto', gap: '0.75rem', marginBottom: '1.5rem', alignItems: 'center' }}>
+              <div style={{ background: 'var(--glass-bg)', borderRadius: '0.75rem', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', padding: '0 0.75rem', height: '38px' }}>
+                <Search size={16} color="var(--text-secondary)" style={{ minWidth: '16px' }} />
                 <input
                   type="text"
-                  placeholder="Search risks or controls..."
+                  placeholder="Search risks..."
                   style={{
                     background: 'transparent',
                     border: 'none',
                     boxShadow: 'none',
                     flex: 1,
                     minWidth: 0,
-                    marginLeft: '0.5rem',
+                    marginLeft: '0.4rem',
                     height: '100%',
                     color: 'var(--text-primary)',
-                    fontSize: '0.95rem',
+                    fontSize: '0.85rem',
                     outline: 'none'
                   }}
                   value={rcmFilters.search}
@@ -2110,41 +2626,74 @@ function App() {
                 />
               </div>
               <select
-                className="form-control"
-                style={{ width: '100%', cursor: 'pointer' }}
+                className="form-control form-control-sm"
                 value={rcmFilters.industry}
                 onChange={e => setRcmFilters({ ...rcmFilters, industry: e.target.value })}
               >
-                <option value="all">All Industries</option>
+                <option value="all">Industries</option>
                 {industries.filter(i => i.is_active !== false).map(i => <option key={i.industry_id} value={i.industry_id}>{i.industry_name}</option>)}
               </select>
               <select
-                className="form-control"
-                style={{ width: '100%', cursor: 'pointer' }}
+                className="form-control form-control-sm"
                 value={rcmFilters.function}
                 onChange={e => setRcmFilters({ ...rcmFilters, function: e.target.value })}
               >
-                <option value="all">All Functions</option>
+                <option value="all">Functions</option>
                 {allFunctions.filter(f => f.is_active !== false).map(f => <option key={f.function_id} value={f.function_id}>{f.function_name}</option>)}
               </select>
               <select
-                className="form-control"
-                style={{ width: '100%', cursor: 'pointer' }}
+                className="form-control form-control-sm"
                 value={rcmFilters.department}
                 onChange={e => setRcmFilters({ ...rcmFilters, department: e.target.value })}
               >
-                <option value="all">All Departments</option>
+                <option value="all">Departments</option>
                 {allDepartments
                   .filter(d => (rcmFilters.function === 'all' || !rcmFilters.function || d.function_id === rcmFilters.function) && d.is_active !== false)
                   .map(d => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)
                 }
               </select>
+              <select
+                className="form-control form-control-sm"
+                value={rcmFilters.category}
+                onChange={e => setRcmFilters({ ...rcmFilters, category: e.target.value })}
+              >
+                <option value="all">Categories</option>
+                {riskCats.map(c => <option key={c.risk_id} value={c.risk_id}>{c.category_name}</option>)}
+              </select>
+              <select
+                className="form-control form-control-sm"
+                value={rcmFilters.frequency}
+                onChange={e => setRcmFilters({ ...rcmFilters, frequency: e.target.value })}
+              >
+                <option value="all">Frequency</option>
+                <option value="Continuous">Continuous</option>
+                <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Monthly">Monthly</option>
+                <option value="Quarterly">Quarterly</option>
+                <option value="Annual">Annual</option>
+              </select>
               <button
                 className="btn btn-primary"
-                onClick={() => setShowNewRcmModal(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}
+                onClick={() => {
+                  setIsEditingRcm(false)
+                  setCurrentRcmId(null)
+                  setNewRcm({
+                    industry_id: '',
+                    function_id: '',
+                    department_id: '',
+                    risk_category_id: '',
+                    risk_description: '',
+                    control_description: '',
+                    reference_standard: '',
+                    control_type: 'Preventive',
+                    control_frequency: 'Continuous'
+                  })
+                  setShowNewRcmModal(true)
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', height: '38px', padding: '0 1rem', fontSize: '0.85rem' }}
               >
-                <Plus size={18} /> New Control
+                <Plus size={16} /> New Control
               </button>
             </div>
 
@@ -2153,49 +2702,245 @@ function App() {
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)' }}>
-                    <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '35%' }}>Risk Scenario</th>
-                    <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '35%' }}>Control Activity</th>
-                    <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '15%' }}>Category</th>
-                    <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '15%' }}>Type/Freq</th>
+                    <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '20%' }}>Function / Department</th>
+                    <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '25%' }}>Risk Scenario</th>
+                    <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '25%' }}>Control Activity</th>
+                    <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '20%' }}>Category / Frequency</th>
+                    <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '10%', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rcmEntries
                     .filter(entry => {
                       const matchesSearch = entry.risk_description?.toLowerCase().includes(rcmFilters.search.toLowerCase()) ||
-                        entry.control_description?.toLowerCase().includes(rcmFilters.search.toLowerCase())
+                        entry.control_description?.toLowerCase().includes(rcmFilters.search.toLowerCase()) ||
+                        entry.reference_standard?.toLowerCase().includes(rcmFilters.search.toLowerCase())
                       const matchesIndustry = rcmFilters.industry === 'all' || entry.industry_id === rcmFilters.industry
                       const matchesFunction = rcmFilters.function === 'all' || entry.function_id === rcmFilters.function
                       const matchesDepartment = rcmFilters.department === 'all' || !rcmFilters.department || entry.department_id === rcmFilters.department
-                      return matchesSearch && matchesIndustry && matchesFunction && matchesDepartment
+                      const matchesCategory = rcmFilters.category === 'all' || entry.risk_category_id === rcmFilters.category
+                      const matchesFrequency = rcmFilters.frequency === 'all' || entry.control_frequency === rcmFilters.frequency
+                      return matchesSearch && matchesIndustry && matchesFunction && matchesDepartment && matchesCategory && matchesFrequency
                     })
                     .map((entry) => (
                       <tr key={entry.rcm_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                         <td style={{ padding: '1rem', verticalAlign: 'top' }}>
-                          <div style={{ fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.9rem', lineHeight: '1.5' }}>{entry.risk_description}</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{entry.functions?.function_name} • {entry.departments?.department_name}</div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: '500', color: 'var(--text-primary)' }}>{entry.functions?.function_name}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{entry.departments?.department_name}</div>
+                        </td>
+                        <td style={{ padding: '1rem', verticalAlign: 'top' }}>
+                          <div style={{ fontWeight: '500', fontSize: '0.9rem', lineHeight: '1.5' }}>{entry.risk_description}</div>
                         </td>
                         <td style={{ padding: '1rem', verticalAlign: 'top' }}>
                           <div style={{ fontSize: '0.875rem' }}>{entry.control_description}</div>
                           {entry.reference_standard && <div style={{ fontSize: '0.7rem', color: 'var(--accent-blue)', marginTop: '0.25rem' }}>Ref: {entry.reference_standard}</div>}
                         </td>
-                        <td style={{ padding: '1rem' }}>
-                          <span className="badge badge-low" style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-                            {entry.risk_categories?.category_name}
-                          </span>
+                        <td style={{ padding: '1rem', verticalAlign: 'top' }}>
+                          <div style={{ display: 'inline-flex' }}>
+                            <span className="badge badge-low" style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '0.7rem' }}>
+                              {entry.risk_categories?.category_name}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{entry.control_frequency}</div>
                         </td>
-                        <td style={{ padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{entry.control_frequency}</td>
+                        <td style={{ padding: '1rem', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                            <button
+                              onClick={() => openEditRcmModal(entry)}
+                              className="btn btn-secondary"
+                              style={{ padding: '0.4rem', minWidth: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              title="Edit"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRcm(entry.rcm_id)}
+                              className="btn btn-secondary"
+                              style={{ padding: '0.4rem', minWidth: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-red)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                 </tbody>
               </table>
             </div>
           </div>
+        ) : activeView === 'risk-register' ? (
+          <div className="risk-register-view">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px 180px 140px', gap: '1rem', marginBottom: '2rem' }}>
+              <div style={{ background: 'var(--glass-bg)', borderRadius: '0.75rem', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', padding: '0 1rem', height: '42px' }}>
+                <Search size={18} color="var(--text-secondary)" style={{ minWidth: '18px' }} />
+                <input
+                  type="text"
+                  placeholder="Search risks by title or description..."
+                  value={riskRegisterFilters.search}
+                  onChange={e => setRiskRegisterFilters({ ...riskRegisterFilters, search: e.target.value })}
+                  style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none', marginLeft: '0.8rem', flex: 1 }}
+                />
+              </div>
+              <select
+                className="form-control"
+                value={riskRegisterFilters.category}
+                onChange={e => setRiskRegisterFilters({ ...riskRegisterFilters, category: e.target.value })}
+              >
+                <option value="all">All Categories</option>
+                {riskCats.map(cat => <option key={cat.category_id} value={cat.category_id}>{cat.category_name}</option>)}
+              </select>
+              <select
+                className="form-control"
+                value={riskRegisterFilters.status}
+                onChange={e => setRiskRegisterFilters({ ...riskRegisterFilters, status: e.target.value })}
+              >
+                <option value="all">All Statuses</option>
+                <option value="Open">Open</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Mitigated">Mitigated</option>
+                <option value="Closed">Closed</option>
+              </select>
+              <select
+                className="form-control"
+                value={riskRegisterFilters.year}
+                onChange={e => setRiskRegisterFilters({ ...riskRegisterFilters, year: e.target.value })}
+              >
+                {[...Array(5)].map((_, i) => {
+                  const y = (new Date().getFullYear() - 2 + i).toString();
+                  return <option key={y} value={y}>{y} FY</option>
+                })}
+              </select>
+            </div>
+
+            <div style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                    <th style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Risk Detail</th>
+                    <th style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Category</th>
+                    <th style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'center' }}>Inherent</th>
+                    <th style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'center' }}>Residual</th>
+                    <th style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Owner</th>
+                    <th style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Status</th>
+                    <th style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {riskRegisterEntries
+                    .filter(entry => {
+                      const matchesSearch = entry.risk_title.toLowerCase().includes(riskRegisterFilters.search.toLowerCase()) ||
+                        entry.risk_description.toLowerCase().includes(riskRegisterFilters.search.toLowerCase());
+                      const matchesCategory = riskRegisterFilters.category === 'all' || entry.risk_category_id === riskRegisterFilters.category;
+                      const matchesStatus = riskRegisterFilters.status === 'all' || entry.status === riskRegisterFilters.status;
+                      const matchesYear = entry.fiscal_year.toString() === riskRegisterFilters.year;
+                      return matchesSearch && matchesCategory && matchesStatus && matchesYear;
+                    })
+                    .map(entry => {
+                      const getScoreColor = (score: number) => {
+                        if (score >= 20) return '#dc2626';
+                        if (score >= 12) return '#f59e0b';
+                        if (score >= 8) return '#10b981';
+                        return '#3b82f6';
+                      };
+
+                      return (
+                        <tr key={entry.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                          <td style={{ padding: '1.25rem' }}>
+                            <div style={{ fontWeight: '600', color: '#fff', marginBottom: '0.25rem' }}>{entry.risk_title}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{entry.risk_description.substring(0, 100)}...</div>
+                          </td>
+                          <td style={{ padding: '1.25rem' }}>
+                            <span style={{ fontSize: '0.85rem' }}>{entry.risk_categories?.category_name}</span>
+                          </td>
+                          <td style={{ padding: '1.25rem', textAlign: 'center' }}>
+                            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <div style={{ fontWeight: '700', fontSize: '1.1rem', color: getScoreColor(entry.inherent_score) }}>{entry.inherent_score}</div>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>{entry.inherent_likelihood}x{entry.inherent_impact}</div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '1.25rem', textAlign: 'center' }}>
+                            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <div style={{ fontWeight: '700', fontSize: '1.1rem', color: getScoreColor(entry.residual_score) }}>{entry.residual_score}</div>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>{entry.residual_likelihood}x{entry.residual_impact}</div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '1.25rem' }}>
+                            <div style={{ fontSize: '0.85rem', fontWeight: '500' }}>{entry.risk_owner}</div>
+                          </td>
+                          <td style={{ padding: '1.25rem' }}>
+                            <span className={`badge badge-${entry.status.toLowerCase().replace(' ', '-')}`}>{entry.status}</span>
+                          </td>
+                          <td style={{ padding: '1.25rem', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                              <button
+                                onClick={() => {
+                                  setNewRiskEntry(entry);
+                                  setIsEditingRisk(true);
+                                  setCurrentRiskId(entry.id);
+                                  setShowNewRiskModal(true);
+                                }}
+                                className="btn btn-secondary"
+                                style={{ padding: '0.4rem' }}
+                                title="Edit Assessment"
+                              >
+                                <Edit3 size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRisk(entry.id)}
+                                className="btn btn-secondary"
+                                style={{ padding: '0.4rem', color: 'var(--error)' }}
+                                title="Delete Assessment"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  {riskRegisterEntries.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        <ShieldAlert size={40} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                        <div>No risks identified for this fiscal year.</div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         ) : (
           <section className="observations-section">
-            <div className="section-title">
-              <CheckCircle size={24} color="var(--accent-blue)" />
-              <h2>Active Findings List</h2>
+            <div className="section-title" style={{ justifyContent: 'space-between', width: '100%', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <CheckCircle size={24} color="var(--accent-blue)" />
+                <h2>Active Observations List</h2>
+              </div>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setIsEditingObs(false)
+                  setCurrentObsId(null)
+                  setNewObs({
+                    procedure_id: '',
+                    condition: '',
+                    criteria: '',
+                    cause: '',
+                    effect: '',
+                    recommendation: '',
+                    risk_rating: 'Low' as any,
+                    title: '',
+                    audit_id: ''
+                  })
+                  setUploadedAttachments([])
+                  setShowNewModal(true)
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Plus size={18} /> New Observation
+              </button>
             </div>
             {isDataLoading ? (
               <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
@@ -2226,7 +2971,23 @@ function App() {
                           </span>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <button
+                          onClick={() => openEditObsModal(obs)}
+                          className="btn btn-secondary"
+                          style={{ padding: '0.5rem', minWidth: 'auto' }}
+                          title="Edit"
+                        >
+                          <Edit3 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteObs(obs.observation_id)}
+                          className="btn btn-secondary"
+                          style={{ padding: '0.5rem', minWidth: 'auto', color: 'var(--accent-red)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                         <button
                           onClick={() => setSelectedObs(obs)}
                           style={{
@@ -2239,7 +3000,6 @@ function App() {
                           }}>
                           View Details
                         </button>
-                        <ChevronRight color="var(--text-secondary)" size={20} />
                       </div>
                     </div>
                   ))
@@ -2547,7 +3307,7 @@ function App() {
           <div className="modal-overlay" onClick={() => setShowNewModal(false)}>
             <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
               <div className="modal-header">
-                <h2>New Audit Finding</h2>
+                <h2>{isEditingObs ? 'Edit Audit Observation' : 'New Audit Observation'}</h2>
                 <button className="close-btn" onClick={() => setShowNewModal(false)}>
                   <X size={24} />
                 </button>
@@ -2566,7 +3326,7 @@ function App() {
                     <span style={{ fontWeight: '700', fontSize: '0.875rem', textTransform: 'uppercase' }}>AI Audit Assistant</span>
                   </div>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                    Paste your raw audit notes or observation text below, and let AI structure the finding for you.
+                    Paste your raw audit notes or observation text below, and let AI structure the observation for you.
                   </p>
                   <textarea
                     className="form-control"
@@ -2601,11 +3361,21 @@ function App() {
 
                 <form style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }} onSubmit={async (e) => {
                   e.preventDefault()
-                  const { error } = await supabase.from('audit_observations').insert([{
+                  const submission = {
                     ...newObs,
                     audit_id: newObs.audit_id || null, // Convert empty to null
                     evidence_json: uploadedAttachments
-                  }])
+                  }
+
+                  let error;
+                  if (isEditingObs && currentObsId) {
+                    const { error: updateError } = await supabase.from('audit_observations').update(submission).eq('observation_id', currentObsId)
+                    error = updateError;
+                  } else {
+                    const { error: insertError } = await supabase.from('audit_observations').insert([submission])
+                    error = insertError;
+                  }
+
                   if (!error) {
                     setShowNewModal(false)
                     setUploadedAttachments([])
@@ -2632,7 +3402,7 @@ function App() {
                       value={newObs.audit_id || ''}
                       onChange={e => setNewObs({ ...newObs, audit_id: e.target.value })}
                     >
-                      <option value="">None / Independent Finding</option>
+                      <option value="">None / Independent Observation</option>
                       {audits.map(a => (
                         <option key={a.audit_id} value={a.audit_id}>{a.audit_title} ({a.industries?.industry_name})</option>
                       ))}
@@ -2661,14 +3431,14 @@ function App() {
                     <input
                       required
                       className="form-control"
-                      placeholder="Summarized finding title..."
+                      placeholder="Summarized observation title..."
                       value={newObs.title}
                       onChange={e => setNewObs({ ...newObs, title: e.target.value })}
                     />
                   </div>
 
                   <div className="detail-item">
-                    <label className="detail-label">Condition (Finding)</label>
+                    <label className="detail-label">Condition (Observation)</label>
                     <textarea
                       required
                       className="form-control"
@@ -2788,7 +3558,7 @@ function App() {
                       transition: 'opacity 0.2s'
                     }}
                   >
-                    {isUploading ? 'Finalizing Uploads...' : 'Save Observation'}
+                    {isUploading ? 'Finalizing Uploads...' : (isEditingObs ? 'Update Observation' : 'Save Observation')}
                   </button>
                 </form>
               </div>
@@ -3023,6 +3793,233 @@ function App() {
           </div>
         )
       }
+
+      {/* Risk Assessment Modal */}
+      {
+        showNewRiskModal && (
+          <div className="modal-overlay" onClick={() => setShowNewRiskModal(false)}>
+            <div className="modal-content fade-in" style={{ maxWidth: '800px', width: '90%', borderRadius: '1.5rem' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header" style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '0.6rem', borderRadius: '0.75rem' }}>
+                    <ShieldAlert size={24} color="var(--accent-blue)" />
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: '700' }}>{isEditingRisk ? 'Edit Risk Assessment' : 'New Risk Assessment'}</h2>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Identify and assess organizational risks for the current fiscal year</p>
+                  </div>
+                </div>
+                <button className="close-btn" onClick={() => setShowNewRiskModal(false)}>
+                  <X size={20} />
+                </button>
+              </div>
+              <form onSubmit={handleSaveRisk} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                  <div className="detail-item">
+                    <label className="detail-label">Source from RCM (Optional)</label>
+                    <select
+                      className="form-control"
+                      value={newRiskEntry.rcm_id || ''}
+                      onChange={e => {
+                        const rcmId = e.target.value;
+                        const rcmEntry = rcmEntries.find(r => r.rcm_id === rcmId);
+                        if (rcmEntry) {
+                          setNewRiskEntry({
+                            ...newRiskEntry,
+                            rcm_id: rcmId,
+                            risk_title: rcmEntry.risk_description.substring(0, 50),
+                            risk_description: rcmEntry.risk_description,
+                            risk_category_id: rcmEntry.risk_category_id,
+                            action_plan: `Source Control: ${rcmEntry.control_description}`
+                          });
+                        } else {
+                          setNewRiskEntry({ ...newRiskEntry, rcm_id: null });
+                        }
+                      }}
+                    >
+                      <option value="">-- Manual Entry --</option>
+                      {rcmEntries.map(rcm => (
+                        <option key={rcm.rcm_id} value={rcm.rcm_id}>
+                          {rcm.risk_description.substring(0, 60)}...
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="detail-item">
+                    <label className="detail-label">Risk Category</label>
+                    <select
+                      className="form-control"
+                      required
+                      value={newRiskEntry.risk_category_id}
+                      onChange={e => setNewRiskEntry({ ...newRiskEntry, risk_category_id: e.target.value })}
+                    >
+                      <option value="">Select Category...</option>
+                      {riskCats.map(cat => <option key={cat.category_id} value={cat.category_id}>{cat.category_name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="detail-item">
+                  <label className="detail-label">Risk Title</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    required
+                    placeholder="e.g. Unauthorized access to production database"
+                    value={newRiskEntry.risk_title}
+                    onChange={e => setNewRiskEntry({ ...newRiskEntry, risk_title: e.target.value })}
+                  />
+                </div>
+
+                <div className="detail-item">
+                  <label className="detail-label">Risk Description</label>
+                  <textarea
+                    className="form-control"
+                    rows={3}
+                    required
+                    placeholder="Detailed description of the risk scenario..."
+                    value={newRiskEntry.risk_description}
+                    onChange={e => setNewRiskEntry({ ...newRiskEntry, risk_description: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '1rem', border: '1px solid var(--border-color)' }}>
+                  {/* Inherent Risk */}
+                  <div>
+                    <h4 style={{ fontSize: '0.9rem', marginBottom: '1.25rem', color: 'var(--accent-blue)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Inherent Risk Assessment</span>
+                      <span style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                        Score: {(newRiskEntry.inherent_likelihood || 0) * (newRiskEntry.inherent_impact || 0)}
+                      </span>
+                    </h4>
+                    <div className="detail-item" style={{ marginBottom: '1rem' }}>
+                      <label className="detail-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        Likelihood
+                        <span>{newRiskEntry.inherent_likelihood} / 5</span>
+                      </label>
+                      <input
+                        type="range" min="1" max="5" step="1"
+                        className="form-control"
+                        value={newRiskEntry.inherent_likelihood}
+                        onChange={e => setNewRiskEntry({ ...newRiskEntry, inherent_likelihood: parseInt(e.target.value) })}
+                        style={{ height: 'auto', padding: '0.5rem 0', cursor: 'pointer' }}
+                      />
+                    </div>
+                    <div className="detail-item">
+                      <label className="detail-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        Impact
+                        <span>{newRiskEntry.inherent_impact} / 5</span>
+                      </label>
+                      <input
+                        type="range" min="1" max="5" step="1"
+                        className="form-control"
+                        value={newRiskEntry.inherent_impact}
+                        onChange={e => setNewRiskEntry({ ...newRiskEntry, inherent_impact: parseInt(e.target.value) })}
+                        style={{ height: 'auto', padding: '0.5rem 0', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Residual Risk */}
+                  <div>
+                    <h4 style={{ fontSize: '0.9rem', marginBottom: '1.25rem', color: 'var(--accent-purple)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Residual Risk Assessment</span>
+                      <span style={{ background: 'rgba(167, 139, 250, 0.1)', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                        Score: {(newRiskEntry.residual_likelihood || 0) * (newRiskEntry.residual_impact || 0)}
+                      </span>
+                    </h4>
+                    <div className="detail-item" style={{ marginBottom: '1rem' }}>
+                      <label className="detail-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        Likelihood
+                        <span>{newRiskEntry.residual_likelihood} / 5</span>
+                      </label>
+                      <input
+                        type="range" min="1" max="5" step="1"
+                        className="form-control"
+                        value={newRiskEntry.residual_likelihood}
+                        onChange={e => setNewRiskEntry({ ...newRiskEntry, residual_likelihood: parseInt(e.target.value) })}
+                        style={{ height: 'auto', padding: '0.5rem 0', cursor: 'pointer' }}
+                      />
+                    </div>
+                    <div className="detail-item">
+                      <label className="detail-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        Impact
+                        <span>{newRiskEntry.residual_impact} / 5</span>
+                      </label>
+                      <input
+                        type="range" min="1" max="5" step="1"
+                        className="form-control"
+                        value={newRiskEntry.residual_impact}
+                        onChange={e => setNewRiskEntry({ ...newRiskEntry, residual_impact: parseInt(e.target.value) })}
+                        style={{ height: 'auto', padding: '0.5rem 0', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 140px', gap: '1.5rem' }}>
+                  <div className="detail-item">
+                    <label className="detail-label">Risk Owner</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="e.g. IT Manager, CFO..."
+                      value={newRiskEntry.risk_owner}
+                      onChange={e => setNewRiskEntry({ ...newRiskEntry, risk_owner: e.target.value })}
+                    />
+                  </div>
+                  <div className="detail-item">
+                    <label className="detail-label">Mitigation Strategy</label>
+                    <select
+                      className="form-control"
+                      value={newRiskEntry.mitigation_strategy}
+                      onChange={e => setNewRiskEntry({ ...newRiskEntry, mitigation_strategy: e.target.value as any })}
+                    >
+                      <option value="Mitigate">Mitigate</option>
+                      <option value="Accept">Accept</option>
+                      <option value="Transfer">Transfer</option>
+                      <option value="Avoid">Avoid</option>
+                    </select>
+                  </div>
+                  <div className="detail-item">
+                    <label className="detail-label">Fiscal Year</label>
+                    <select
+                      className="form-control"
+                      value={newRiskEntry.fiscal_year}
+                      onChange={e => setNewRiskEntry({ ...newRiskEntry, fiscal_year: parseInt(e.target.value) })}
+                    >
+                      {[...Array(5)].map((_, i) => (
+                        <option key={i} value={new Date().getFullYear() - 1 + i}>
+                          {new Date().getFullYear() - 1 + i} FY
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="detail-item">
+                  <label className="detail-label">Action Plan / Next Steps</label>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    placeholder="Describe planned mitigations and control measures..."
+                    value={newRiskEntry.action_plan}
+                    onChange={e => setNewRiskEntry({ ...newRiskEntry, action_plan: e.target.value })}
+                  />
+                </div>
+
+                <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowNewRiskModal(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem' }}>
+                    {isEditingRisk ? 'Update Assessment' : 'Create Assessment'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )
+      }
+
       {/* New RCM Modal */}
       {
         showNewRcmModal && (
@@ -3034,8 +4031,8 @@ function App() {
                     <Grid size={20} color="var(--accent-blue)" />
                   </div>
                   <div>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: '700' }}>New Risk Control</h2>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Define a new risk scenario and its mitigating control</p>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: '700' }}>{isEditingRcm ? 'Edit Risk Control' : 'New Risk Control'}</h2>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{isEditingRcm ? 'Update existing risk scenario and control' : 'Define a new risk scenario and its mitigating control'}</p>
                   </div>
                 </div>
                 <button className="close-btn" onClick={() => setShowNewRcmModal(false)}>
@@ -3080,6 +4077,19 @@ function App() {
                     >
                       <option value="">Select Industry...</option>
                       {industries.filter(i => i.is_active !== false).map(i => <option key={i.industry_id} value={i.industry_id}>{i.industry_name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="detail-item">
+                    <label className="detail-label">Risk Category</label>
+                    <select
+                      className="form-control"
+                      required
+                      value={newRcm.risk_category_id}
+                      onChange={e => setNewRcm({ ...newRcm, risk_category_id: e.target.value })}
+                    >
+                      <option value="">Select Risk Category...</option>
+                      {riskCats.map(c => <option key={c.risk_id} value={c.risk_id}>{c.category_name}</option>)}
                     </select>
                   </div>
 
@@ -3154,18 +4164,7 @@ function App() {
                     )}
                   </div>
 
-                  <div className="detail-item">
-                    <label className="detail-label">Risk Category</label>
-                    <select
-                      className="form-control"
-                      required
-                      value={newRcm.risk_category_id}
-                      onChange={e => setNewRcm({ ...newRcm, risk_category_id: e.target.value })}
-                    >
-                      <option value="">Select Risk Category...</option>
-                      {riskCats.map(c => <option key={c.risk_id} value={c.risk_id}>{c.category_name}</option>)}
-                    </select>
-                  </div>
+
 
                   <div className="detail-item" style={{ gridColumn: 'span 2' }}>
                     <label className="detail-label">Risk Description</label>
@@ -3239,7 +4238,7 @@ function App() {
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary" style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', padding: '0.6rem 2rem', borderRadius: '0.5rem', fontWeight: '600', cursor: 'pointer' }}>
-                    Create
+                    {isEditingRcm ? 'Update Control' : 'Create Control'}
                   </button>
                 </div>
               </form>
@@ -3247,7 +4246,92 @@ function App() {
           </div>
         )
       }
-    </div >
+
+      {/* Reference Document Upload Modal */}
+      {
+        showRefUploadModal && (
+          <div className="modal-overlay" onClick={() => setShowRefUploadModal(false)}>
+            <div className="modal-content fade-in" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+              <div className="modal-header">
+                <h2>Upload Reference Document</h2>
+                <button className="close-btn" onClick={() => setShowRefUploadModal(false)}><X /></button>
+              </div>
+              <div style={{ padding: '2rem' }}>
+                <div className="detail-item" style={{ marginBottom: '1.5rem' }}>
+                  <label className="detail-label">Document Title</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. ISO 27001 Standard"
+                    value={newRefDoc.title}
+                    onChange={e => setNewRefDoc({ ...newRefDoc, title: e.target.value })}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="detail-item" style={{ marginBottom: '2rem' }}>
+                  <label className="detail-label">Category</label>
+                  <select
+                    className="form-control"
+                    value={newRefDoc.category}
+                    onChange={e => setNewRefDoc({ ...newRefDoc, category: e.target.value })}
+                  >
+                    <option value="Standard">Standard</option>
+                    <option value="Regulation">Regulation</option>
+                    <option value="Policy">Policy</option>
+                    <option value="Procedure">Procedure</option>
+                    <option value="Manual">Manual</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div style={{
+                  border: '2px dashed var(--border-color)',
+                  borderRadius: '1rem',
+                  padding: '3rem 2rem',
+                  textAlign: 'center',
+                  background: 'rgba(255,255,255,0.02)',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '1rem'
+                }}>
+                  <input
+                    type="file"
+                    onChange={handleRefUpload}
+                    disabled={isRefUploading}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                  />
+                  <div style={{ background: 'rgba(59, 130, 246, 0.1)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Upload color="var(--accent-blue)" size={32} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
+                      {isRefUploading ? 'Uploading Document...' : 'Click or Drag to Upload'}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      PDF, DOCX, or Excel files up to 10MB
+                    </div>
+                  </div>
+                </div>
+
+                {isRefUploading && (
+                  <div style={{ marginTop: '1.5rem', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', background: 'var(--accent-blue)', width: '50%', borderRadius: '2px' }} className="loading-bar"></div>
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="btn btn-secondary" onClick={() => setShowRefUploadModal(false)}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div>
   )
 }
 
