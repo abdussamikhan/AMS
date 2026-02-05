@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
-  }
   public: {
     Tables: {
       audit_observations: {
@@ -76,7 +71,7 @@ export type Database = {
             referencedColumns: ["procedure_id"]
           }
         ]
-      }
+      },
       audit_plans: {
         Row: {
           created_at: string | null
@@ -114,7 +109,7 @@ export type Database = {
             referencedColumns: ["id"]
           }
         ]
-      }
+      },
       audit_procedures: {
         Row: {
           created_at: string
@@ -146,7 +141,7 @@ export type Database = {
             referencedColumns: ["mapping_id"]
           }
         ]
-      }
+      },
       audits: {
         Row: {
           assigned_auditor: string | null
@@ -224,12 +219,11 @@ export type Database = {
             referencedColumns: ["plan_id"]
           }
         ]
-      }
+      },
       departments: {
         Row: {
           created_at: string
           department_id: string
-          department_name: string
           department_name: string
           function_id: string
           is_active?: boolean
@@ -257,7 +251,7 @@ export type Database = {
             referencedColumns: ["function_id"]
           }
         ]
-      }
+      },
       framework_mapping: {
         Row: {
           created_at: string
@@ -292,7 +286,7 @@ export type Database = {
             referencedColumns: ["risk_id"]
           }
         ]
-      }
+      },
       functions: {
         Row: {
           created_at: string
@@ -311,7 +305,7 @@ export type Database = {
           is_active?: boolean
         }
         Relationships: []
-      }
+      },
       industries: {
         Row: {
           created_at: string
@@ -332,7 +326,7 @@ export type Database = {
           is_active?: boolean
         }
         Relationships: []
-      }
+      },
       management_responses: {
         Row: {
           action_plan: string | null
@@ -373,7 +367,7 @@ export type Database = {
             referencedColumns: ["observation_id"]
           }
         ]
-      }
+      },
       notifications: {
         Row: {
           created_at: string
@@ -408,7 +402,7 @@ export type Database = {
             referencedColumns: ["id"]
           }
         ]
-      }
+      },
       profiles: {
         Row: {
           created_at: string
@@ -440,7 +434,7 @@ export type Database = {
             referencedColumns: ["id"]
           }
         ]
-      }
+      },
       risk_categories: {
         Row: {
           category_name: string
@@ -461,7 +455,7 @@ export type Database = {
           risk_id?: string
         }
         Relationships: []
-      }
+      },
       risk_control_matrix: {
         Row: {
           control_description: string
