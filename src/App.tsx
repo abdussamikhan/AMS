@@ -30,7 +30,10 @@ import {
   Clock,
   Sparkles,
   Wand2,
-  Grid
+  Grid,
+  Layers,
+  Shield,
+  Users
 } from 'lucide-react'
 import {
   BarChart,
@@ -40,7 +43,10 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend
+  Legend,
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -119,7 +125,7 @@ function App() {
   const [allFunctions, setAllFunctions] = useState<any[]>([])
   const [allDepartments, setAllDepartments] = useState<any[]>([])
   const [riskCats, setRiskCats] = useState<any[]>([])
-  const [rcmFilters, setRcmFilters] = useState({ industry: '', function: '', department: '' })
+  const [rcmFilters, setRcmFilters] = useState({ industry: '', function: '', department: '', search: '' })
   const [showNewRcmModal, setShowNewRcmModal] = useState(false)
   const [newRcm, setNewRcm] = useState({
     industry_id: '',
@@ -136,6 +142,17 @@ function App() {
   // Audit Planning & Scheduling State
   const [auditPlans, setAuditPlans] = useState<any[]>([])
   const [audits, setAudits] = useState<any[]>([])
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
+  const [isTemplateUploading, setIsTemplateUploading] = useState(false)
+
+  // Auto-select first plan when data loads
+  useEffect(() => {
+    if (auditPlans.length > 0 && !selectedPlanId) {
+      setSelectedPlanId(auditPlans[0].plan_id)
+    }
+  }, [auditPlans])
+
+
   const [showNewPlanModal, setShowNewPlanModal] = useState(false)
   const [showNewAuditModal, setShowNewAuditModal] = useState(false)
   const [newPlan, setNewPlan] = useState({ title: '', year: new Date().getFullYear(), description: '', status: 'Draft' })
@@ -162,6 +179,8 @@ function App() {
   const [isCustomDepartmentAudit, setIsCustomDepartmentAudit] = useState(false)
   const [customFunctionAudit, setCustomFunctionAudit] = useState('')
   const [customDepartmentAudit, setCustomDepartmentAudit] = useState('')
+
+  const [analyticsView, setAnalyticsView] = useState<'audits' | 'rcm' | 'management'>('audits')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -289,7 +308,8 @@ function App() {
         setRcmFilters({
           industry: genInd.industry_id,
           function: genFunc.function_id,
-          department: genDept.department_id
+          department: genDept.department_id,
+          search: ''
         })
       }
     } catch (err) {
@@ -857,6 +877,92 @@ function App() {
     return acc
   }, [])
 
+  const rcmCategoryData = rcmEntries.reduce((acc: any[], entry) => {
+    const categoryName = entry.risk_categories?.category_name || 'Uncategorized'
+    let cat = acc.find(c => c.name === categoryName)
+    if (!cat) {
+      cat = { name: categoryName, count: 0 }
+      acc.push(cat)
+    }
+    cat.count += 1
+    return acc
+  }, [])
+
+  const rcmFunctionData = rcmEntries.reduce((acc: any[], entry) => {
+    const functionName = entry.functions?.function_name || 'Generic'
+    let func = acc.find(f => f.name === functionName)
+    if (!func) {
+      func = { name: functionName, count: 0 }
+      acc.push(func)
+    }
+    func.count += 1
+    return acc
+  }, [])
+
+  const rcmControlTypeData = rcmEntries.reduce((acc: any[], entry) => {
+    const type = entry.control_type || 'Unspecified'
+    let t = acc.find(item => item.name === type)
+    if (!t) {
+      t = { name: type, value: 0 }
+      acc.push(t)
+    }
+    t.value += 1
+    return acc
+  }, [])
+
+  const planStatusData = auditPlans.reduce((acc: any[], plan) => {
+    let s = acc.find(item => item.name === plan.status)
+    if (!s) {
+      s = { name: plan.status, value: 0 }
+      acc.push(s)
+    }
+    s.value += 1
+    return acc
+  }, [])
+
+  const engagementStatusData = audits.reduce((acc: any[], audit) => {
+    let s = acc.find(item => item.name === audit.status)
+    if (!s) {
+      s = { name: audit.status, value: 0 }
+      acc.push(s)
+    }
+    s.value += 1
+    return acc
+  }, [])
+
+  const resourceWorkloadData = audits.reduce((acc: any[], audit) => {
+    const name = audit.profiles?.full_name || 'Unassigned'
+    let r = acc.find(item => item.name === name)
+    if (!r) {
+      r = { name, count: 0 }
+      acc.push(r)
+    }
+    r.count += 1
+    return acc
+  }, [])
+
+  const auditByFunctionData = audits.reduce((acc: any[], audit) => {
+    const name = audit.functions?.function_name || 'Generic'
+    let f = acc.find(item => item.name === name)
+    if (!f) {
+      f = { name, count: 0 }
+      acc.push(f)
+    }
+    f.count += 1
+    return acc
+  }, [])
+
+  const auditByDepartmentData = audits.reduce((acc: any[], audit) => {
+    const name = audit.departments?.department_name || 'Generic'
+    let d = acc.find(item => item.name === name)
+    if (!d) {
+      d = { name, count: 0 }
+      acc.push(d)
+    }
+    d.count += 1
+    return acc
+  }, [])
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
@@ -1051,6 +1157,15 @@ function App() {
             <BarChart3 />
             Reporting
           </div>
+          {profile?.role === 'admin' && (
+            <div
+              className={`nav-link ${activeView === 'admin' ? 'active' : ''}`}
+              onClick={() => setActiveView('admin')}
+            >
+              <Shield />
+              Admin
+            </div>
+          )}
         </nav>
 
         <div className="logout-container">
@@ -1278,137 +1393,545 @@ function App() {
 
         {activeView === 'overview' ? (
           <>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-label">Total Findings</div>
-                <div className="stat-value">{stats.total}</div>
-              </div>
-              <div className="stat-card" style={{ borderLeft: '4px solid var(--critical)' }}>
-                <div className="stat-label">Critical Risks</div>
-                <div className="stat-value" style={{ color: 'var(--error)' }}>{stats.critical}</div>
-              </div>
-              <div className="stat-card" style={{ borderLeft: '4px solid var(--error)' }}>
-                <div className="stat-label">High Risks</div>
-                <div className="stat-value" style={{ color: '#fca5a5' }}>{stats.high}</div>
-              </div>
-              <div className="stat-card" style={{ borderLeft: '4px solid var(--warning)' }}>
-                <div className="stat-label">Medium Risks</div>
-                <div className="stat-value" style={{ color: 'var(--warning)' }}>{stats.medium}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div className="stats-grid" style={{ flex: 1, marginBottom: 0 }}>
+                <div className="stat-card">
+                  <div className="stat-label">Total Findings</div>
+                  <div className="stat-value">{stats.total}</div>
+                </div>
+                <div className="stat-card" style={{ borderLeft: '4px solid var(--critical)' }}>
+                  <div className="stat-label">Critical Risks</div>
+                  <div className="stat-value" style={{ color: 'var(--error)' }}>{stats.critical}</div>
+                </div>
+                <div className="stat-card" style={{ borderLeft: '4px solid var(--error)' }}>
+                  <div className="stat-label">High Risks</div>
+                  <div className="stat-value" style={{ color: '#fca5a5' }}>{stats.high}</div>
+                </div>
+                <div className="stat-card" style={{ borderLeft: '4px solid var(--warning)' }}>
+                  <div className="stat-label">Medium Risks</div>
+                  <div className="stat-value" style={{ color: 'var(--warning)' }}>{stats.medium}</div>
+                </div>
               </div>
             </div>
 
-            <section style={{ marginBottom: '3rem' }}>
-              <div className="section-title">
-                <Activity size={24} color="var(--accent-cyan)" />
-                <h2>Risk Heatmap & Distribution</h2>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1px' }}>
+              <button
+                onClick={() => setAnalyticsView('audits')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'none',
+                  border: 'none',
+                  color: analyticsView === 'audits' ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                  borderBottom: analyticsView === 'audits' ? '2px solid var(--accent-blue)' : '2px solid transparent',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Audit Findings
+              </button>
+              <button
+                onClick={() => setAnalyticsView('rcm')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'none',
+                  border: 'none',
+                  color: analyticsView === 'rcm' ? 'var(--accent-purple)' : 'var(--text-secondary)',
+                  borderBottom: analyticsView === 'rcm' ? '2px solid var(--accent-purple)' : '2px solid transparent',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+              >
+                RCM Analytics
+              </button>
+              <button
+                onClick={() => setAnalyticsView('management')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'none',
+                  border: 'none',
+                  color: analyticsView === 'management' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                  borderBottom: analyticsView === 'management' ? '2px solid var(--accent-cyan)' : '2px solid transparent',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Audit Management
+              </button>
+            </div>
+
+            {analyticsView === 'audits' ? (
+              <section style={{ marginBottom: '3rem' }}>
+                <div className="section-title">
+                  <BarChart3 size={24} color="var(--accent-blue)" />
+                  <h2>Risk Heatmap</h2>
+                </div>
+                <div style={{ height: '400px', background: 'var(--card-bg)', padding: '2rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis dataKey="name" stroke="var(--text-secondary)" fontSize={12} axisLine={false} tickLine={false} />
+                      <YAxis stroke="var(--text-secondary)" fontSize={12} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }}
+                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                      />
+                      <Legend iconType="circle" />
+                      <Bar dataKey="Critical" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="High" stackId="a" fill="#f87171" />
+                      <Bar dataKey="Medium" stackId="a" fill="#fbbf24" />
+                      <Bar dataKey="Low" stackId="a" fill="#10b981" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </section>
+            ) : analyticsView === 'rcm' ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '3rem' }}>
+                <section style={{ background: 'var(--card-bg)', padding: '1.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)' }}>
+                  <div className="section-title" style={{ marginBottom: '1.5rem' }}>
+                    <BarChart3 size={20} color="var(--accent-blue)" />
+                    <h3 style={{ fontSize: '1rem' }}>Risks by Category</h3>
+                  </div>
+                  <div style={{ height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={rcmCategoryData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                        <XAxis dataKey="name" stroke="var(--text-secondary)" fontSize={10} axisLine={false} tickLine={false} />
+                        <YAxis stroke="var(--text-secondary)" fontSize={10} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }}
+                        />
+                        <Bar dataKey="count" fill="var(--accent-blue)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+
+                <section style={{ background: 'var(--card-bg)', padding: '1.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)' }}>
+                  <div className="section-title" style={{ marginBottom: '1.5rem' }}>
+                    <Activity size={20} color="var(--accent-cyan)" />
+                    <h3 style={{ fontSize: '1rem' }}>Control Type Breakdown</h3>
+                  </div>
+                  <div style={{ height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={rcmControlTypeData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {rcmControlTypeData.map((_entry, index) => (
+                            <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b'][index % 3]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }}
+                        />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+
+                <section style={{ background: 'var(--card-bg)', padding: '1.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)', gridColumn: 'span 2' }}>
+                  <div className="section-title" style={{ marginBottom: '1.5rem' }}>
+                    <Grid size={20} color="var(--accent-purple)" />
+                    <h3 style={{ fontSize: '1rem' }}>Risk Density by Function</h3>
+                  </div>
+                  <div style={{ height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={rcmFunctionData} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
+                        <XAxis type="number" stroke="var(--text-secondary)" fontSize={10} axisLine={false} tickLine={false} />
+                        <YAxis dataKey="name" type="category" stroke="var(--text-secondary)" fontSize={10} axisLine={false} tickLine={false} width={100} />
+                        <Tooltip
+                          contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }}
+                        />
+                        <Bar dataKey="count" fill="var(--accent-cyan)" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
               </div>
-              <div style={{ background: 'var(--card-bg)', padding: '2rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)', height: '400px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis dataKey="name" stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
-                    <Tooltip
-                      contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }}
-                      itemStyle={{ color: '#fff' }}
-                    />
-                    <Legend iconType="circle" />
-                    <Bar dataKey="Critical" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="High" stackId="a" fill="#f87171" />
-                    <Bar dataKey="Medium" stackId="a" fill="#fbbf24" />
-                    <Bar dataKey="Low" stackId="a" fill="#10b981" />
-                  </BarChart>
-                </ResponsiveContainer>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '3rem' }}>
+                <section style={{ background: 'var(--card-bg)', padding: '1.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)' }}>
+                  <div className="section-title" style={{ marginBottom: '1.5rem' }}>
+                    <ClipboardList size={20} color="var(--accent-blue)" />
+                    <h3 style={{ fontSize: '1rem' }}>Audit Plan Status</h3>
+                  </div>
+                  <div style={{ height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={planStatusData}
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {planStatusData.map((_entry, index) => (
+                            <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#fbbf24', '#f87171'][index % 4]} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+
+                <section style={{ background: 'var(--card-bg)', padding: '1.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)' }}>
+                  <div className="section-title" style={{ marginBottom: '1.5rem' }}>
+                    <CheckCircle2 size={20} color="var(--accent-cyan)" />
+                    <h3 style={{ fontSize: '1rem' }}>Engagement Status</h3>
+                  </div>
+                  <div style={{ height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={engagementStatusData}
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {engagementStatusData.map((_entry, index) => (
+                            <Cell key={`cell-${index}`} fill={['#6366f1', '#14b8a6', '#f59e0b', '#ef4444'][index % 4]} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+
+                <section style={{ background: 'var(--card-bg)', padding: '1.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)', gridColumn: 'span 2' }}>
+                  <div className="section-title" style={{ marginBottom: '1.5rem' }}>
+                    <UserIcon size={20} color="var(--accent-purple)" />
+                    <h3 style={{ fontSize: '1rem' }}>Resource Allocation & Workload</h3>
+                  </div>
+                  <div style={{ height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={resourceWorkloadData} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
+                        <XAxis type="number" stroke="var(--text-secondary)" fontSize={10} axisLine={false} tickLine={false} />
+                        <YAxis dataKey="name" type="category" stroke="var(--text-secondary)" fontSize={10} axisLine={false} tickLine={false} width={120} />
+                        <Tooltip contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
+                        <Bar dataKey="count" fill="var(--accent-purple)" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+
+                <section style={{ background: 'var(--card-bg)', padding: '1.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)' }}>
+                  <div className="section-title" style={{ marginBottom: '1.5rem' }}>
+                    <Grid size={20} color="var(--accent-blue)" />
+                    <h3 style={{ fontSize: '1rem' }}>Audits by Function</h3>
+                  </div>
+                  <div style={{ height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={auditByFunctionData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                        <XAxis dataKey="name" stroke="var(--text-secondary)" fontSize={10} axisLine={false} tickLine={false} />
+                        <YAxis stroke="var(--text-secondary)" fontSize={10} axisLine={false} tickLine={false} />
+                        <Tooltip contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
+                        <Bar dataKey="count" fill="var(--accent-blue)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+
+                <section style={{ background: 'var(--card-bg)', padding: '1.5rem', borderRadius: '1.25rem', border: '1px solid var(--border-color)' }}>
+                  <div className="section-title" style={{ marginBottom: '1.5rem' }}>
+                    <Layers size={20} color="var(--accent-cyan)" />
+                    <h3 style={{ fontSize: '1rem' }}>Audits by Department</h3>
+                  </div>
+                  <div style={{ height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={auditByDepartmentData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                        <XAxis dataKey="name" stroke="var(--text-secondary)" fontSize={10} axisLine={false} tickLine={false} />
+                        <YAxis stroke="var(--text-secondary)" fontSize={10} axisLine={false} tickLine={false} />
+                        <Tooltip contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
+                        <Bar dataKey="count" fill="var(--accent-cyan)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
               </div>
-            </section>
+            )}
           </>
+        ) : activeView === 'admin' ? (
+          <div className="admin-view">
+            <h1 style={{ fontSize: '1.75rem', fontWeight: '700', marginBottom: '2rem' }}>Admin Dashboard</h1>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
+              {/* Audit Template Upload */}
+              <div style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', padding: '1.5rem' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                  <FileText size={20} color="var(--accent-blue)" /> Audit Report Templates
+                </h3>
+                <div style={{ background: 'var(--bg-dark)', borderRadius: '0.75rem', border: '1px dashed var(--border-color)', padding: '2rem', textAlign: 'center' }}>
+                  <Upload size={48} color="var(--text-secondary)" style={{ marginBottom: '1rem', opacity: 0.5 }} />
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                    Upload PDF templates here. The AI will use these to generate structured audit reports.
+                  </p>
+                  <label className="btn btn-primary" style={{ display: 'inline-flex', cursor: 'pointer' }}>
+                    {isTemplateUploading ? 'Uploading...' : 'Upload Template'}
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      style={{ display: 'none' }}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        setIsTemplateUploading(true)
+                        try {
+                          const fileExt = file.name.split('.').pop()
+                          const fileName = `${Math.random()}.${fileExt}`
+                          const { error } = await supabase.storage
+                            .from('audit-templates')
+                            .upload(fileName, file)
+                          if (error) throw error
+                          alert('Template uploaded successfully!')
+                        } catch (err: any) {
+                          alert('Error uploading template: ' + err.message)
+                        } finally {
+                          setIsTemplateUploading(false)
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Industry Management */}
+              <div style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', padding: '1.5rem' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                  <Target size={20} color="var(--accent-cyan)" /> Industry Management
+                </h3>
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                        <th style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Industry Name</th>
+                        <th style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Status</th>
+                        <th style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'right' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {industries.map((ind) => (
+                        <tr key={ind.industry_id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '0.75rem' }}>{ind.industry_name}</td>
+                          <td style={{ padding: '0.75rem' }}>
+                            <span className={`badge ${ind.is_active !== false ? 'badge-completed' : 'badge-draft'}`}>
+                              {ind.is_active !== false ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                            <button
+                              className={`btn ${ind.is_active !== false ? 'btn-secondary' : 'btn-primary'}`}
+                              style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
+                              onClick={async () => {
+                                const newStatus = ind.is_active === false ? true : false
+                                const { error } = await supabase
+                                  .from('industries')
+                                  .update({ is_active: newStatus })
+                                  .eq('industry_id', ind.industry_id)
+
+                                if (error) {
+                                  alert('Error updating status')
+                                } else {
+                                  // Optimistic Update
+                                  setIndustries(prev => prev.map(i => i.industry_id === ind.industry_id ? { ...i, is_active: newStatus } : i))
+                                }
+                              }}
+                            >
+                              {ind.is_active !== false ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Function Management */}
+              <div style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', padding: '1.5rem' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                  <Layers size={20} color="var(--accent-purple)" /> Function Management
+                </h3>
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                        <th style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Function Name</th>
+                        <th style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Status</th>
+                        <th style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'right' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allFunctions.map((func) => (
+                        <tr key={func.function_id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '0.75rem' }}>{func.function_name}</td>
+                          <td style={{ padding: '0.75rem' }}>
+                            <span className={`badge ${func.is_active !== false ? 'badge-completed' : 'badge-draft'}`}>
+                              {func.is_active !== false ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                            <button
+                              className={`btn ${func.is_active !== false ? 'btn-secondary' : 'btn-primary'}`}
+                              style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
+                              onClick={async () => {
+                                const newStatus = func.is_active === false ? true : false
+                                const { error } = await supabase
+                                  .from('functions')
+                                  .update({ is_active: newStatus })
+                                  .eq('function_id', func.function_id)
+
+                                if (error) {
+                                  alert('Error updating status')
+                                } else {
+                                  setAllFunctions(prev => prev.map(f => f.function_id === func.function_id ? { ...f, is_active: newStatus } : f))
+                                }
+                              }}
+                            >
+                              {func.is_active !== false ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Department Management */}
+              <div style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', padding: '1.5rem' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                  <Users size={20} color="var(--accent-pink)" /> Department Management
+                </h3>
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                        <th style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Department Name</th>
+                        <th style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Status</th>
+                        <th style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.8rem', textAlign: 'right' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allDepartments.map((dept) => (
+                        <tr key={dept.department_id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '0.75rem' }}>{dept.department_name}</td>
+                          <td style={{ padding: '0.75rem' }}>
+                            <span className={`badge ${dept.is_active !== false ? 'badge-completed' : 'badge-draft'}`}>
+                              {dept.is_active !== false ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                            <button
+                              className={`btn ${dept.is_active !== false ? 'btn-secondary' : 'btn-primary'}`}
+                              style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
+                              onClick={async () => {
+                                const newStatus = dept.is_active === false ? true : false
+                                const { error } = await supabase
+                                  .from('departments')
+                                  .update({ is_active: newStatus })
+                                  .eq('department_id', dept.department_id)
+
+                                if (error) {
+                                  alert('Error updating status')
+                                } else {
+                                  setAllDepartments(prev => prev.map(d => d.department_id === dept.department_id ? { ...d, is_active: newStatus } : d))
+                                }
+                              }}
+                            >
+                              {dept.is_active !== false ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
         ) : activeView === 'audit-planning' ? (
           <div className="audit-planning-view">
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 2fr', gap: '2rem' }}>
-              {/* Left: Annual Plans List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              {/* Plan Selection Dropdown */}
               <div>
                 <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <ClipboardList size={20} color="var(--accent-blue)" /> Annual Plans
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {auditPlans.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)', background: 'var(--card-bg)', border: '1px dashed var(--border-color)', borderRadius: '1rem' }}>
-                      No annual plans found.
-                    </div>
-                  ) : (
-                    auditPlans.map(plan => (
-                      <div key={plan.plan_id} style={{
-                        background: 'var(--card-bg)',
-                        padding: '1.25rem',
-                        borderRadius: '1rem',
-                        border: '1px solid var(--border-color)',
-                        cursor: 'pointer'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                          <div style={{ fontWeight: '600', color: '#fff' }}>{plan.title}</div>
-                          <div className="badge badge-low" style={{ fontSize: '0.65rem' }}>{plan.year}</div>
-                        </div>
-                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{plan.description}</div>
-                        <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Status: {plan.status}</span>
-                          <span>{audits.filter(a => a.plan_id === plan.plan_id).length} Audits</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'var(--card-bg)', padding: '1.5rem', borderRadius: '1rem', border: '1px solid var(--border-color)' }}>
+                  <span style={{ fontWeight: '600', color: 'var(--text-secondary)' }}>Select Plan:</span>
+                  <select
+                    className="form-control"
+                    style={{ maxWidth: '400px', cursor: 'pointer' }}
+                    value={selectedPlanId || ''}
+                    onChange={(e) => setSelectedPlanId(e.target.value)}
+                  >
+                    {auditPlans.map((plan) => (
+                      <option key={plan.plan_id} value={plan.plan_id}>
+                        {plan.year} Plan - {plan.title} ({plan.status})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {/* Right: Scheduled Audits */}
+              {/* Scheduled Engagements for selected plan */}
               <div>
                 <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Calendar size={20} color="var(--accent-blue)" /> Scheduled Engagements
+                  <Calendar size={20} color="var(--accent-cyan)" /> Scheduled Engagements
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {audits.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)', background: 'var(--card-bg)', borderRadius: '1rem', border: '1px dotted var(--border-color)' }}>
-                      No audits scheduled.
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1rem' }}>
+                  {audits.filter(a => a.plan_id === selectedPlanId).length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)', background: 'var(--card-bg)', border: '1px dashed var(--border-color)', borderRadius: '1rem', gridColumn: '1 / -1' }}>
+                      Select a plan or schedule a new engagement.
                     </div>
                   ) : (
-                    audits.map(audit => (
-                      <div key={audit.audit_id} style={{
-                        background: 'var(--card-bg)',
-                        padding: '1.5rem',
-                        borderRadius: '1rem',
-                        border: '1px solid var(--border-color)',
-                        display: 'grid',
-                        gridTemplateColumns: '1fr auto',
-                        gap: '1rem'
-                      }}>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                            <h4 style={{ margin: 0, color: '#fff' }}>{audit.audit_title}</h4>
-                            <span className="badge badge-low" style={{ fontSize: '0.65rem' }}>{audit.status}</span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                            <span>Sector: {audit.sectors?.sector_name}</span>
-                            <span>Func: {audit.functions?.function_name}</span>
-                          </div>
-                          <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <Calendar size={14} color="var(--accent-blue)" />
-                              {audit.start_date} to {audit.end_date}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <UserIcon size={14} color="var(--accent-blue)" />
-                              {audit.profiles?.full_name}
+                    audits.filter(a => a.plan_id === selectedPlanId).map(audit => (
+                      <div key={audit.audit_id} className="stat-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <h4 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--accent-cyan)' }}>{audit.audit_title}</h4>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                              {audit.industries?.industry_name} • {audit.functions?.function_name} • {audit.departments?.department_name}
                             </div>
                           </div>
+                          <span className={`badge badge-${audit.status.toLowerCase().replace(' ', '-')}`}>{audit.status}</span>
                         </div>
-                        <button
-                          onClick={() => {
-                            setActiveView('findings')
-                            setSearchQuery(audit.audit_title)
-                          }}
-                          style={{ alignSelf: 'center', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.5rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600' }}
-                        >
-                          View Findings
-                        </button>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                              <Clock size={14} /> {audit.start_date}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                              <UserIcon size={14} /> {audit.profiles?.full_name || 'Unassigned'}
+                            </div>
+                          </div>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
+                            onClick={() => { setActiveView('findings'); setSearchQuery(audit.audit_title); }}
+                          >
+                            View Findings
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
@@ -1418,110 +1941,104 @@ function App() {
           </div>
         ) : activeView === 'rcm' ? (
           <div className="rcm-view">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) auto', gap: '1rem', marginBottom: '2rem', background: 'var(--card-bg)', padding: '1.25rem', borderRadius: '1rem', border: '1px solid var(--border-color)', alignItems: 'center' }}>
-              <div>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Industry</label>
-                <select
-                  className="form-control"
-                  value={rcmFilters.industry}
-                  onChange={e => setRcmFilters(prev => ({ ...prev, industry: e.target.value, function: '', department: '' }))}
-                >
-                  <option value="">All Industries</option>
-                  {industries.map(i => <option key={i.industry_id} value={i.industry_id}>{i.industry_name}</option>)}
-                </select>
+            {/* Filters Section */}
+            {/* Filters Section */}
+            {/* Filters Section */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(250px, 1fr) 180px 180px 180px auto', gap: '1rem', marginBottom: '1.5rem', alignItems: 'center' }}>
+              <div style={{ background: 'var(--glass-bg)', borderRadius: '0.75rem', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', padding: '0 1rem', height: '42px' }}>
+                <Search size={18} color="var(--text-secondary)" style={{ minWidth: '18px' }} />
+                <input
+                  type="text"
+                  placeholder="Search risks or controls..."
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    boxShadow: 'none',
+                    flex: 1,
+                    minWidth: 0,
+                    marginLeft: '0.5rem',
+                    height: '100%',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.95rem',
+                    outline: 'none'
+                  }}
+                  value={rcmFilters.search}
+                  onChange={e => setRcmFilters({ ...rcmFilters, search: e.target.value })}
+                />
               </div>
-              <div>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Function</label>
-                <select
-                  className="form-control"
-                  value={rcmFilters.function}
-                  onChange={e => setRcmFilters(prev => ({ ...prev, function: e.target.value, department: '' }))}
-                >
-                  <option value="">All Functions</option>
-                  {allFunctions.map(f => (
-                    <option key={f.function_id} value={f.function_id}>{f.function_name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Department</label>
-                <select
-                  className="form-control"
-                  value={rcmFilters.department}
-                  onChange={e => setRcmFilters(prev => ({ ...prev, department: e.target.value }))}
-                >
-                  <option value="">All Departments</option>
-                  {allDepartments.filter(d => !rcmFilters.function || d.function_id === rcmFilters.function).map(d => (
-                    <option key={d.department_id} value={d.department_id}>{d.department_name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Search Matrix</label>
-                <div style={{ position: 'relative' }}>
-                  <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                  <input
-                    className="form-control"
-                    style={{ paddingLeft: '35px' }}
-                    placeholder="Search descriptions..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                  />
-                </div>
-              </div>
+              <select
+                className="form-control"
+                style={{ width: '100%', cursor: 'pointer' }}
+                value={rcmFilters.industry}
+                onChange={e => setRcmFilters({ ...rcmFilters, industry: e.target.value })}
+              >
+                <option value="all">All Industries</option>
+                {industries.filter(i => i.is_active !== false).map(i => <option key={i.industry_id} value={i.industry_id}>{i.industry_name}</option>)}
+              </select>
+              <select
+                className="form-control"
+                style={{ width: '100%', cursor: 'pointer' }}
+                value={rcmFilters.function}
+                onChange={e => setRcmFilters({ ...rcmFilters, function: e.target.value })}
+              >
+                <option value="all">All Functions</option>
+                {allFunctions.filter(f => f.is_active !== false).map(f => <option key={f.function_id} value={f.function_id}>{f.function_name}</option>)}
+              </select>
+              <select
+                className="form-control"
+                style={{ width: '100%', cursor: 'pointer' }}
+                value={rcmFilters.department}
+                onChange={e => setRcmFilters({ ...rcmFilters, department: e.target.value })}
+              >
+                <option value="all">All Departments</option>
+                {allDepartments
+                  .filter(d => (rcmFilters.function === 'all' || !rcmFilters.function || d.function_id === rcmFilters.function) && d.is_active !== false)
+                  .map(d => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)
+                }
+              </select>
               <button
                 className="btn btn-primary"
-                style={{ alignSelf: 'end', height: '42px', padding: '0 1.5rem', background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: '0.5rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 onClick={() => setShowNewRcmModal(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}
               >
-                <Plus size={18} />
-                New Control
+                <Plus size={18} /> New Control
               </button>
             </div>
 
-            <div style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            {/* RCM Table */}
+            <div style={{ background: 'var(--card-bg)', borderRadius: '1rem', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)' }}>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>INDUSTRY / FUNCTION / DEPARTMENT</th>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>RISK DESCRIPTION</th>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>CONTROL DESCRIPTION</th>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>REFERENCE</th>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>TYPE</th>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: '600' }}>FREQ</th>
+                    <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '35%' }}>Risk Scenario</th>
+                    <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '35%' }}>Control Activity</th>
+                    <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '15%' }}>Category</th>
+                    <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '15%' }}>Type/Freq</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rcmEntries
                     .filter(entry => {
-                      const matchesSearch = !searchQuery ||
-                        entry.risk_description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        entry.control_description?.toLowerCase().includes(searchQuery.toLowerCase())
-                      const matchesIndustry = !rcmFilters.industry || entry.industry_id === rcmFilters.industry
-                      const matchesFunction = !rcmFilters.function || entry.function_id === rcmFilters.function
-                      const matchesDepartment = !rcmFilters.department || entry.department_id === rcmFilters.department
+                      const matchesSearch = entry.risk_description?.toLowerCase().includes(rcmFilters.search.toLowerCase()) ||
+                        entry.control_description?.toLowerCase().includes(rcmFilters.search.toLowerCase())
+                      const matchesIndustry = rcmFilters.industry === 'all' || entry.industry_id === rcmFilters.industry
+                      const matchesFunction = rcmFilters.function === 'all' || entry.function_id === rcmFilters.function
+                      const matchesDepartment = rcmFilters.department === 'all' || !rcmFilters.department || entry.department_id === rcmFilters.department
                       return matchesSearch && matchesIndustry && matchesFunction && matchesDepartment
                     })
-                    .map(entry => (
-                      <tr key={entry.rcm_id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    .map((entry) => (
+                      <tr key={entry.rcm_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                         <td style={{ padding: '1rem', verticalAlign: 'top' }}>
-                          <div style={{ fontSize: '0.8125rem', fontWeight: '600', color: '#fff' }}>{entry.industries?.industry_name} /</div>
-                          <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>{entry.functions?.function_name} /</div>
-                          <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>{entry.departments?.department_name}</div>
+                          <div style={{ fontWeight: '500', marginBottom: '0.5rem', fontSize: '0.9rem', lineHeight: '1.5' }}>{entry.risk_description}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{entry.functions?.function_name} • {entry.departments?.department_name}</div>
                         </td>
-                        <td style={{ padding: '1rem', fontSize: '0.875rem', maxWidth: '300px' }}>{entry.risk_description}</td>
-                        <td style={{ padding: '1rem', fontSize: '0.875rem', maxWidth: '300px' }}>{entry.control_description}</td>
-                        <td style={{ padding: '1rem', fontSize: '0.75rem', color: 'var(--accent-blue)', fontWeight: '600' }}>{entry.reference_standard}</td>
+                        <td style={{ padding: '1rem', verticalAlign: 'top' }}>
+                          <div style={{ fontSize: '0.875rem' }}>{entry.control_description}</div>
+                          {entry.reference_standard && <div style={{ fontSize: '0.7rem', color: 'var(--accent-blue)', marginTop: '0.25rem' }}>Ref: {entry.reference_standard}</div>}
+                        </td>
                         <td style={{ padding: '1rem' }}>
-                          <span style={{
-                            padding: '0.25rem 0.6rem',
-                            borderRadius: '1rem',
-                            fontSize: '0.7rem',
-                            fontWeight: '700',
-                            background: entry.control_type === 'Preventive' ? 'rgba(16, 185, 129, 0.1)' : entry.control_type === 'Detective' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                            color: entry.control_type === 'Preventive' ? '#10b981' : entry.control_type === 'Detective' ? '#3b82f6' : '#f59e0b'
-                          }}>
-                            {entry.control_type}
+                          <span className="badge badge-low" style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-blue)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                            {entry.risk_categories?.category_name}
                           </span>
                         </td>
                         <td style={{ padding: '1rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{entry.control_frequency}</td>
@@ -1587,8 +2104,9 @@ function App() {
               </div>
             )}
           </section>
-        )}
-      </main>
+        )
+        }
+      </main >
 
       {/* Details Modal */}
       {
@@ -1612,7 +2130,7 @@ function App() {
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                   <button
-                    onClick={() => generateDetailedPDF(selectedObs)}
+                    onClick={() => generateDetailedPDF(selectedObs!)}
                     style={{
                       background: 'rgba(59, 130, 246, 0.1)',
                       color: 'var(--accent-blue)',
@@ -2137,227 +2655,230 @@ function App() {
       }
 
       {/* New Annual Plan Modal */}
-      {showNewPlanModal && (
-        <div className="modal-overlay" onClick={() => setShowNewPlanModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '700' }}>Create Annual Audit Plan</h2>
-              <button className="close-btn" onClick={() => setShowNewPlanModal(false)}>
-                <X size={20} />
-              </button>
+      {
+        showNewPlanModal && (
+          <div className="modal-overlay" onClick={() => setShowNewPlanModal(false)}>
+            <div className="modal-content" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '700' }}>Create Annual Audit Plan</h2>
+                <button className="close-btn" onClick={() => setShowNewPlanModal(false)}>
+                  <X size={20} />
+                </button>
+              </div>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const { error: insError } = await supabase.from('audit_plans').insert([newPlan]);
+                if (insError) alert(insError.message);
+                else {
+                  setShowNewPlanModal(false);
+                  setNewPlan({ title: '', year: new Date().getFullYear(), description: '', status: 'Draft' });
+                  fetchAuditPlanningData();
+                }
+              }} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div className="detail-item">
+                  <label className="detail-label">Plan Title</label>
+                  <input className="form-control" required value={newPlan.title} onChange={e => setNewPlan({ ...newPlan, title: e.target.value })} />
+                </div>
+                <div className="detail-item">
+                  <label className="detail-label">Year</label>
+                  <input type="number" className="form-control" required value={newPlan.year} onChange={e => setNewPlan({ ...newPlan, year: parseInt(e.target.value) })} />
+                </div>
+                <div className="detail-item">
+                  <label className="detail-label">Description</label>
+                  <textarea className="form-control" value={newPlan.description} onChange={e => setNewPlan({ ...newPlan, description: e.target.value })} />
+                </div>
+                <button type="submit" className="auth-button">Create Plan</button>
+              </form>
             </div>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const { data, error } = await supabase.from('audit_plans').insert([newPlan]).select();
-              if (error) alert(error.message);
-              else {
-                setShowNewPlanModal(false);
-                setNewPlan({ title: '', year: new Date().getFullYear(), description: '', status: 'Draft' });
-                fetchAuditPlanningData();
-              }
-            }} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div className="detail-item">
-                <label className="detail-label">Plan Title</label>
-                <input className="form-control" required value={newPlan.title} onChange={e => setNewPlan({ ...newPlan, title: e.target.value })} />
-              </div>
-              <div className="detail-item">
-                <label className="detail-label">Year</label>
-                <input type="number" className="form-control" required value={newPlan.year} onChange={e => setNewPlan({ ...newPlan, year: parseInt(e.target.value) })} />
-              </div>
-              <div className="detail-item">
-                <label className="detail-label">Description</label>
-                <textarea className="form-control" value={newPlan.description} onChange={e => setNewPlan({ ...newPlan, description: e.target.value })} />
-              </div>
-              <button type="submit" className="auth-button">Create Plan</button>
-            </form>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Schedule Audit Modal */}
-      {showNewAuditModal && (
-        <div className="modal-overlay" onClick={() => setShowNewAuditModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '600px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '700' }}>Schedule Audit Engagement</h2>
-              <button className="close-btn" onClick={() => setShowNewAuditModal(false)}>
-                <X size={20} />
-              </button>
+      {
+        showNewAuditModal && (
+          <div className="modal-overlay" onClick={() => setShowNewAuditModal(false)}>
+            <div className="modal-content" style={{ maxWidth: '600px' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '700' }}>Schedule Audit Engagement</h2>
+                <button className="close-btn" onClick={() => setShowNewAuditModal(false)}>
+                  <X size={20} />
+                </button>
+              </div>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  let functionId = newAudit.function_id;
+                  let departmentId = newAudit.department_id;
+
+                  // 1. Handle Custom Function
+                  if (isCustomFunctionAudit && customFunctionAudit) {
+                    const { data: newFunc, error: funcError } = await supabase
+                      .from('functions')
+                      .insert({ function_name: customFunctionAudit })
+                      .select()
+                      .single();
+                    if (funcError) throw new Error('Error creating function: ' + funcError.message);
+                    if (newFunc) functionId = newFunc.function_id;
+                  }
+
+                  // 2. Handle Custom Department
+                  if (isCustomDepartmentAudit && customDepartmentAudit) {
+                    if (!functionId) throw new Error('Function is required to create a custom department.');
+                    const { data: newDept, error: deptError } = await supabase
+                      .from('departments')
+                      .insert({ department_name: customDepartmentAudit, function_id: functionId })
+                      .select()
+                      .single();
+                    if (deptError) throw new Error('Error creating department: ' + deptError.message);
+                    if (newDept) departmentId = newDept.department_id;
+                  }
+
+                  const submission = {
+                    ...newAudit,
+                    industry_id: newAudit.industry_id || null,
+                    function_id: functionId || null,
+                    department_id: departmentId || null,
+                    plan_id: newAudit.plan_id || null
+                  };
+
+                  const { error } = await supabase.from('audits').insert([submission]).select();
+                  if (error) throw error;
+
+                  setShowNewAuditModal(false);
+                  setNewAudit({
+                    plan_id: auditPlans[0]?.plan_id || '',
+                    audit_title: '',
+                    assigned_auditor: '',
+                    start_date: '',
+                    end_date: '',
+                    status: 'Scheduled',
+                    industry_id: '',
+                    function_id: '',
+                    department_id: ''
+                  });
+                  setIsCustomFunctionAudit(false);
+                  setIsCustomDepartmentAudit(false);
+                  setCustomFunctionAudit('');
+                  setCustomDepartmentAudit('');
+                  fetchAuditPlanningData();
+                  fetchRcmContext(); // Refresh global context
+                } catch (err: any) {
+                  alert(err.message);
+                }
+              }} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div className="detail-item">
+                  <label className="detail-label">Annual Plan</label>
+                  <select className="form-control" required value={newAudit.plan_id} onChange={e => setNewAudit({ ...newAudit, plan_id: e.target.value })}>
+                    <option value="">Select Plan...</option>
+                    {auditPlans.map(p => <option key={p.plan_id} value={p.plan_id}>{p.title} ({p.year})</option>)}
+                  </select>
+                </div>
+                <div className="detail-item">
+                  <label className="detail-label">Engagement Title</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    required
+                    placeholder="e.g. Finance Audit Q1, IT General Controls..."
+                    value={newAudit.audit_title}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setNewAudit(prev => ({ ...prev, audit_title: val }));
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="detail-item">
+                    <label className="detail-label">Function</label>
+                    <select
+                      className="form-control"
+                      required
+                      value={isCustomFunctionAudit ? 'custom' : newAudit.function_id}
+                      onChange={e => {
+                        if (e.target.value === 'custom') {
+                          setIsCustomFunctionAudit(true);
+                          setNewAudit({ ...newAudit, function_id: '', department_id: '' });
+                        } else {
+                          setIsCustomFunctionAudit(false);
+                          setNewAudit({ ...newAudit, function_id: e.target.value, department_id: '' });
+                        }
+                      }}
+                    >
+                      <option value="">Select Function...</option>
+                      {allFunctions.map(f => <option key={f.function_id} value={f.function_id}>{f.function_name}</option>)}
+                      <option value="custom">+ Other / Custom...</option>
+                    </select>
+                    {isCustomFunctionAudit && (
+                      <input
+                        type="text"
+                        className="form-control"
+                        style={{ marginTop: '0.5rem' }}
+                        placeholder="Enter function name..."
+                        required
+                        value={customFunctionAudit}
+                        onChange={e => setCustomFunctionAudit(e.target.value)}
+                      />
+                    )}
+                  </div>
+                  <div className="detail-item">
+                    <label className="detail-label">Department</label>
+                    <select
+                      className="form-control"
+                      required
+                      value={isCustomDepartmentAudit ? 'custom' : newAudit.department_id}
+                      disabled={!newAudit.function_id && !isCustomFunctionAudit}
+                      onChange={e => {
+                        if (e.target.value === 'custom') {
+                          setIsCustomDepartmentAudit(true);
+                          setNewAudit({ ...newAudit, department_id: '' });
+                        } else {
+                          setIsCustomDepartmentAudit(false);
+                          setNewAudit({ ...newAudit, department_id: e.target.value });
+                        }
+                      }}
+                    >
+                      <option value="">Select Department...</option>
+                      {!isCustomFunctionAudit && allDepartments.filter(d => d.function_id === newAudit.function_id).map(d => (
+                        <option key={d.department_id} value={d.department_id}>{d.department_name}</option>
+                      ))}
+                      <option value="custom">+ Other / Custom...</option>
+                    </select>
+                    {isCustomDepartmentAudit && (
+                      <input
+                        type="text"
+                        className="form-control"
+                        style={{ marginTop: '0.5rem' }}
+                        placeholder="Enter department name..."
+                        required
+                        value={customDepartmentAudit}
+                        onChange={e => setCustomDepartmentAudit(e.target.value)}
+                      />
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="detail-item">
+                    <label className="detail-label">Start Date</label>
+                    <input type="date" className="form-control" required value={newAudit.start_date} onChange={e => setNewAudit({ ...newAudit, start_date: e.target.value })} />
+                  </div>
+                  <div className="detail-item">
+                    <label className="detail-label">End Date</label>
+                    <input type="date" className="form-control" required value={newAudit.end_date} onChange={e => setNewAudit({ ...newAudit, end_date: e.target.value })} />
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <label className="detail-label">Lead Auditor</label>
+                  <select className="form-control" required value={newAudit.assigned_auditor} onChange={e => setNewAudit({ ...newAudit, assigned_auditor: e.target.value })}>
+                    <option value="">Select Auditor...</option>
+                    {auditors.map(aud => <option key={aud.id} value={aud.id}>{aud.full_name}</option>)}
+                  </select>
+                </div>
+                <button type="submit" className="auth-button">Schedule Engagement</button>
+              </form>
             </div>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              try {
-                let functionId = newAudit.function_id;
-                let departmentId = newAudit.department_id;
-
-                // 1. Handle Custom Function
-                if (isCustomFunctionAudit && customFunctionAudit) {
-                  const { data: newFunc, error: funcError } = await supabase
-                    .from('functions')
-                    .insert({ function_name: customFunctionAudit })
-                    .select()
-                    .single();
-                  if (funcError) throw new Error('Error creating function: ' + funcError.message);
-                  if (newFunc) functionId = newFunc.function_id;
-                }
-
-                // 2. Handle Custom Department
-                if (isCustomDepartmentAudit && customDepartmentAudit) {
-                  if (!functionId) throw new Error('Function is required to create a custom department.');
-                  const { data: newDept, error: deptError } = await supabase
-                    .from('departments')
-                    .insert({ department_name: customDepartmentAudit, function_id: functionId })
-                    .select()
-                    .single();
-                  if (deptError) throw new Error('Error creating department: ' + deptError.message);
-                  if (newDept) departmentId = newDept.department_id;
-                }
-
-                const submission = {
-                  ...newAudit,
-                  industry_id: newAudit.industry_id || null,
-                  function_id: functionId || null,
-                  department_id: departmentId || null,
-                  plan_id: newAudit.plan_id || null
-                };
-
-                const { error } = await supabase.from('audits').insert([submission]).select();
-                if (error) throw error;
-
-                setShowNewAuditModal(false);
-                setNewAudit({
-                  plan_id: auditPlans[0]?.plan_id || '',
-                  audit_title: '',
-                  assigned_auditor: '',
-                  start_date: '',
-                  end_date: '',
-                  status: 'Scheduled',
-                  industry_id: '',
-                  function_id: '',
-                  department_id: ''
-                });
-                setIsCustomFunctionAudit(false);
-                setIsCustomDepartmentAudit(false);
-                setCustomFunctionAudit('');
-                setCustomDepartmentAudit('');
-                fetchAuditPlanningData();
-                fetchRcmContext(); // Refresh global context
-              } catch (err: any) {
-                alert(err.message);
-              }
-            }} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div className="detail-item">
-                <label className="detail-label">Annual Plan</label>
-                <select className="form-control" required value={newAudit.plan_id} onChange={e => setNewAudit({ ...newAudit, plan_id: e.target.value })}>
-                  <option value="">Select Plan...</option>
-                  {auditPlans.map(p => <option key={p.plan_id} value={p.plan_id}>{p.title} ({p.year})</option>)}
-                </select>
-              </div>
-              <div className="detail-item">
-                <label className="detail-label">Engagement Title</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  required
-                  placeholder="e.g. Finance Audit Q1, IT General Controls..."
-                  value={newAudit.audit_title}
-                  onChange={e => {
-                    const val = e.target.value;
-                    setNewAudit(prev => ({ ...prev, audit_title: val }));
-                  }}
-                />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="detail-item">
-                  <label className="detail-label">Function</label>
-                  <select
-                    className="form-control"
-                    required
-                    value={isCustomFunctionAudit ? 'custom' : newAudit.function_id}
-                    onChange={e => {
-                      if (e.target.value === 'custom') {
-                        setIsCustomFunctionAudit(true);
-                        setNewAudit({ ...newAudit, function_id: '', department_id: '' });
-                      } else {
-                        setIsCustomFunctionAudit(false);
-                        setNewAudit({ ...newAudit, function_id: e.target.value, department_id: '' });
-                      }
-                    }}
-                  >
-                    <option value="">Select Function...</option>
-                    {allFunctions.map(f => <option key={f.function_id} value={f.function_id}>{f.function_name}</option>)}
-                    <option value="custom">+ Other / Custom...</option>
-                  </select>
-                  {isCustomFunctionAudit && (
-                    <input
-                      type="text"
-                      className="form-control"
-                      style={{ marginTop: '0.5rem' }}
-                      placeholder="Enter function name..."
-                      required
-                      value={customFunctionAudit}
-                      onChange={e => setCustomFunctionAudit(e.target.value)}
-                    />
-                  )}
-                </div>
-                <div className="detail-item">
-                  <label className="detail-label">Department</label>
-                  <select
-                    className="form-control"
-                    required
-                    value={isCustomDepartmentAudit ? 'custom' : newAudit.department_id}
-                    disabled={!newAudit.function_id && !isCustomFunctionAudit}
-                    onChange={e => {
-                      if (e.target.value === 'custom') {
-                        setIsCustomDepartmentAudit(true);
-                        setNewAudit({ ...newAudit, department_id: '' });
-                      } else {
-                        setIsCustomDepartmentAudit(false);
-                        setNewAudit({ ...newAudit, department_id: e.target.value });
-                      }
-                    }}
-                  >
-                    <option value="">Select Department...</option>
-                    {!isCustomFunctionAudit && allDepartments.filter(d => d.function_id === newAudit.function_id).map(d => (
-                      <option key={d.department_id} value={d.department_id}>{d.department_name}</option>
-                    ))}
-                    <option value="custom">+ Other / Custom...</option>
-                  </select>
-                  {isCustomDepartmentAudit && (
-                    <input
-                      type="text"
-                      className="form-control"
-                      style={{ marginTop: '0.5rem' }}
-                      placeholder="Enter department name..."
-                      required
-                      value={customDepartmentAudit}
-                      onChange={e => setCustomDepartmentAudit(e.target.value)}
-                    />
-                  )}
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="detail-item">
-                  <label className="detail-label">Start Date</label>
-                  <input type="date" className="form-control" required value={newAudit.start_date} onChange={e => setNewAudit({ ...newAudit, start_date: e.target.value })} />
-                </div>
-                <div className="detail-item">
-                  <label className="detail-label">End Date</label>
-                  <input type="date" className="form-control" required value={newAudit.end_date} onChange={e => setNewAudit({ ...newAudit, end_date: e.target.value })} />
-                </div>
-              </div>
-              <div className="detail-item">
-                <label className="detail-label">Lead Auditor</label>
-                <select className="form-control" required value={newAudit.assigned_auditor} onChange={e => setNewAudit({ ...newAudit, assigned_auditor: e.target.value })}>
-                  <option value="">Select Auditor...</option>
-                  {auditors.map(aud => <option key={aud.id} value={aud.id}>{aud.full_name}</option>)}
-                </select>
-              </div>
-              <button type="submit" className="auth-button">Schedule Engagement</button>
-            </form>
           </div>
-        </div>
-      )
+        )
       }
       {/* New RCM Modal */}
       {
@@ -2415,7 +2936,7 @@ function App() {
                       onChange={e => setNewRcm({ ...newRcm, industry_id: e.target.value, function_id: '', department_id: '' })}
                     >
                       <option value="">Select Industry...</option>
-                      {industries.map(i => <option key={i.industry_id} value={i.industry_id}>{i.industry_name}</option>)}
+                      {industries.filter(i => i.is_active !== false).map(i => <option key={i.industry_id} value={i.industry_id}>{i.industry_name}</option>)}
                     </select>
                   </div>
 
@@ -2436,7 +2957,7 @@ function App() {
                       }}
                     >
                       <option value="">Select Function...</option>
-                      {allFunctions.map(f => (
+                      {allFunctions.filter(f => f.is_active !== false).map(f => (
                         <option key={f.function_id} value={f.function_id}>{f.function_name}</option>
                       ))}
                       <option value="custom">+ Other / Custom...</option>
@@ -2472,7 +2993,7 @@ function App() {
                       }}
                     >
                       <option value="">Select Department...</option>
-                      {!isCustomFunctionRcm && allDepartments.filter(d => d.function_id === newRcm.function_id).map(d => (
+                      {!isCustomFunctionRcm && allDepartments.filter(d => (d.function_id === newRcm.function_id) && d.is_active !== false).map(d => (
                         <option key={d.department_id} value={d.department_id}>{d.department_name}</option>
                       ))}
                       <option value="custom">+ Other / Custom...</option>

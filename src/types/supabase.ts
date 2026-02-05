@@ -230,19 +230,23 @@ export type Database = {
           created_at: string
           department_id: string
           department_name: string
+          department_name: string
           function_id: string
+          is_active?: boolean
         }
         Insert: {
           created_at?: string
           department_id?: string
           department_name: string
           function_id: string
+          is_active?: boolean
         }
         Update: {
           created_at?: string
           department_id?: string
           department_name?: string
           function_id?: string
+          is_active?: boolean
         }
         Relationships: [
           {
@@ -304,6 +308,7 @@ export type Database = {
           created_at?: string
           function_id?: string
           function_name?: string
+          is_active?: boolean
         }
         Relationships: []
       }
@@ -312,16 +317,19 @@ export type Database = {
           created_at: string
           industry_id: string
           industry_name: string
+          is_active: boolean | null
         }
         Insert: {
           created_at?: string
           industry_id?: string
           industry_name: string
+          is_active?: boolean
         }
         Update: {
           created_at?: string
           industry_id?: string
           industry_name?: string
+          is_active?: boolean
         }
         Relationships: []
       }
@@ -545,7 +553,7 @@ export type Database = {
       | "Annual"
       control_type: "Preventive" | "Detective" | "Corrective"
       risk_level: "Low" | "Medium" | "High" | "Critical"
-      user_role: "auditor" | "manager" | "client"
+      user_role: "auditor" | "manager" | "client" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
