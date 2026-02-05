@@ -3,7 +3,7 @@ import { supabase } from '../supabase'
 import type { Database } from '../types/supabase'
 import type { Observation, Notification, RCMEntry, RiskRegisterEntry, Profile } from '../types'
 import { invokeAiProcessRcm, invokeAiProcessAuditFinding } from '../services/aiService'
-import { downloadCSV, generatePDF, generateDetailedPDF } from '../services/exportService'
+import { downloadCSV, generatePDF, generateDetailedPDF, generateRiskRegisterPDF, downloadRiskRegisterCSV } from '../services/exportService'
 
 export const useAuditData = (session: any) => {
     const [isDataLoading, setIsDataLoading] = useState(false)
@@ -24,12 +24,13 @@ export const useAuditData = (session: any) => {
     const [allFunctions, setAllFunctions] = useState<any[]>([])
     const [allDepartments, setAllDepartments] = useState<any[]>([])
     const [riskCats, setRiskCats] = useState<any[]>([])
-    const [rcmFilters, setRcmFilters] = useState({ industry: 'all', function: 'all', department: 'all', category: 'all', frequency: 'all', search: '' })
+    const [allSystems, setAllSystems] = useState<any[]>([])
+    const [rcmFilters, setRcmFilters] = useState({ industry: 'all', function: 'all', department: 'all', system: 'all', category: 'all', frequency: 'all', search: '' })
     const [showNewRcmModal, setShowNewRcmModal] = useState(false)
     const [refDocs, setRefDocs] = useState<any[]>([])
     const [refFilters, setRefFilters] = useState({ category: 'all', search: '' })
     const [riskRegisterEntries, setRiskRegisterEntries] = useState<RiskRegisterEntry[]>([])
-    const [riskRegisterFilters, setRiskRegisterFilters] = useState({ category: 'all', status: 'all', year: new Date().getFullYear().toString(), search: '' })
+    const [riskRegisterFilters, setRiskRegisterFilters] = useState({ category: 'all', owner: 'all', year: new Date().getFullYear().toString(), search: '' })
     const [showNewRiskModal, setShowNewRiskModal] = useState(false)
     const [isEditingRisk, setIsEditingRisk] = useState(false)
     const [currentRiskId, setCurrentRiskId] = useState<string | null>(null)
@@ -42,9 +43,8 @@ export const useAuditData = (session: any) => {
         residual_likelihood: 2,
         residual_impact: 2,
         risk_owner: '',
-        mitigation_strategy: 'Mitigate',
+        audit_frequency: '12 months',
         action_plan: '',
-        status: 'Open',
         fiscal_year: new Date().getFullYear(),
         rcm_id: null
     })
@@ -56,11 +56,14 @@ export const useAuditData = (session: any) => {
         function_id: '',
         department_id: '',
         risk_category_id: '',
+        risk_title: '',
         risk_description: '',
+        control_title: '',
         control_description: '',
         reference_standard: '',
         control_type: 'Preventive' as any,
-        control_frequency: 'Continuous' as any
+        control_frequency: 'Continuous' as any,
+        system_id: ''
     })
 
     // Audit Planning & Scheduling State
@@ -177,17 +180,23 @@ export const useAuditData = (session: any) => {
     }
 
     const fetchRcmData = async () => {
-        const { data } = await supabase
+        const { data } = await (supabase as any)
             .from('risk_control_matrix')
             .select(`
         *,
         industries(industry_name),
         functions(function_name),
         departments(department_name),
-        risk_categories(category_name)
+        risk_categories(category_name),
+        systems(system_name)
       `)
             .order('created_at', { ascending: false })
         if (data) setRcmEntries(data as RCMEntry[])
+    }
+
+    const fetchSystems = async () => {
+        const { data } = await (supabase as any).from('systems').select('*').eq('is_active', true).order('system_name')
+        if (data) setAllSystems(data)
     }
 
     const fetchRcmContext = async () => {
@@ -236,6 +245,9 @@ export const useAuditData = (session: any) => {
             setAllFunctions(finalFunctions)
             setAllDepartments(finalDepartments)
             setRiskCats(finalCategories)
+
+            // Also fetch systems
+            fetchSystems()
         } catch (err) {
             console.error('Error fetching RCM context:', err)
         }
@@ -338,7 +350,9 @@ export const useAuditData = (session: any) => {
             const data = await invokeAiProcessRcm(rcmAiInput)
             setNewRcm(prev => ({
                 ...prev,
+                risk_title: data.risk_title || '',
                 risk_description: data.risk_description,
+                control_title: data.control_title || '',
                 control_description: data.control_description,
                 reference_standard: data.reference_standard
             }))
@@ -384,11 +398,14 @@ export const useAuditData = (session: any) => {
             function_id: entry.function_id,
             department_id: entry.department_id,
             risk_category_id: entry.risk_category_id,
+            risk_title: entry.risk_title || '',
             risk_description: entry.risk_description,
+            control_title: entry.control_title || '',
             control_description: entry.control_description,
             reference_standard: entry.reference_standard,
             control_type: entry.control_type,
-            control_frequency: entry.control_frequency
+            control_frequency: entry.control_frequency,
+            system_id: entry.system_id || ''
         })
         setIsEditingRcm(true)
         setCurrentRcmId(entry.rcm_id)
@@ -441,7 +458,12 @@ export const useAuditData = (session: any) => {
                 finalDepartmentId = dData.department_id
             }
 
-            const rcmPayload = { ...newRcm, function_id: finalFunctionId, department_id: finalDepartmentId }
+            const rcmPayload = {
+                ...newRcm,
+                function_id: finalFunctionId,
+                department_id: finalDepartmentId,
+                system_id: newRcm.system_id || null
+            }
 
             if (isEditingRcm && currentRcmId) {
                 const { error } = await supabase.from('risk_control_matrix').update(rcmPayload).eq('rcm_id', currentRcmId)
@@ -459,11 +481,14 @@ export const useAuditData = (session: any) => {
                 function_id: '',
                 department_id: '',
                 risk_category_id: '',
+                risk_title: '',
                 risk_description: '',
+                control_title: '',
                 control_description: '',
                 reference_standard: '',
                 control_type: 'Preventive' as any,
-                control_frequency: 'Continuous' as any
+                control_frequency: 'Continuous' as any,
+                system_id: ''
             })
             fetchRcmData()
             fetchRcmContext()
@@ -476,7 +501,7 @@ export const useAuditData = (session: any) => {
         e.preventDefault()
         try {
             if (isEditingRisk && currentRiskId) {
-                const { error } = await supabase.from('risk_register' as any).update(newRiskEntry).eq('risk_id', currentRiskId)
+                const { error } = await supabase.from('risk_register' as any).update(newRiskEntry).eq('id', currentRiskId)
                 if (error) throw error
             } else {
                 const { error } = await supabase.from('risk_register' as any).insert([newRiskEntry])
@@ -493,7 +518,7 @@ export const useAuditData = (session: any) => {
 
     const handleDeleteRisk = async (id: string) => {
         if (window.confirm('Delete this risk assessment?')) {
-            const { error } = await supabase.from('risk_register' as any).delete().eq('risk_id', id)
+            const { error } = await supabase.from('risk_register' as any).delete().eq('id', id)
             if (error) alert(error.message)
             else fetchRiskRegister()
         }
@@ -589,12 +614,20 @@ export const useAuditData = (session: any) => {
         downloadCSV(filteredObservations)
     }
 
+    const handleDownloadRiskRegisterCSV = (entries: RiskRegisterEntry[]) => {
+        downloadRiskRegisterCSV(entries)
+    }
+
     const handleGeneratePDF = (filteredObservations: Observation[], stats: any, profile: Profile | null, email?: string) => {
         generatePDF(filteredObservations, profile, stats, email)
     }
 
     const handleGenerateDetailedPDF = (obs: Observation, profile: Profile | null, email?: string) => {
         generateDetailedPDF(obs, profile, email)
+    }
+
+    const handleGenerateRiskRegisterPDF = (entries: RiskRegisterEntry[], profile: Profile | null, fiscalYear: string, email?: string) => {
+        generateRiskRegisterPDF(entries, profile, fiscalYear, email)
     }
 
     const toggleDepartmentStatus = async (dept: any) => {
@@ -653,6 +686,7 @@ export const useAuditData = (session: any) => {
         allFunctions,
         allDepartments,
         riskCats,
+        allSystems,
         rcmFilters,
         setRcmFilters,
         showNewRcmModal,
@@ -755,12 +789,15 @@ export const useAuditData = (session: any) => {
         handleDeleteRef,
         handleFileUpload,
         handleDownloadCSV,
+        handleDownloadRiskRegisterCSV,
         handleGeneratePDF,
         handleGenerateDetailedPDF,
+        handleGenerateRiskRegisterPDF,
         toggleDepartmentStatus,
         setAllDepartments,
         setAllFunctions,
         setIndustries,
+        setAllSystems,
         setObservations,
         setNotifications,
         setAuditPlans,

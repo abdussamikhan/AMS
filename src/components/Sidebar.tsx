@@ -2,7 +2,6 @@ import React from 'react'
 import {
     LayoutDashboard,
     CheckCircle2,
-    Grid,
     ShieldAlert,
     ClipboardList,
     BarChart3,
@@ -13,7 +12,8 @@ import {
     Settings,
     Database as DatabaseIcon,
     Layout,
-    LogOut
+    LogOut,
+    BookOpen
 } from 'lucide-react'
 import type { Profile } from '../types'
 
@@ -54,13 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <CheckCircle2 />
                     Audit Observations
                 </div>
-                <div
-                    className={`nav-link ${activeView === 'rcm' ? 'active' : ''}`}
-                    onClick={() => setActiveView('rcm')}
-                >
-                    <Grid />
-                    Risk Control Matrix
-                </div>
+
                 <div
                     className={`nav-link ${activeView === 'risk-register' ? 'active' : ''}`}
                     onClick={() => setActiveView('risk-register')}
@@ -125,6 +119,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 >
                                     <Layout size={16} />
                                     Templates
+                                </div>
+                                <div
+                                    className={`nav-link ${activeView === 'admin-library' || activeView === 'rcm' ? 'active' : ''}`}
+                                    onClick={() => setActiveView('rcm')}
+                                    style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}
+                                >
+                                    <BookOpen size={16} />
+                                    Library
                                 </div>
                             </div>
                         )}

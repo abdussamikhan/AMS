@@ -15,6 +15,7 @@ interface RcmModalProps {
     allFunctions: any[];
     allDepartments: any[];
     riskCats: any[];
+    allSystems: any[];
     isCustomFunctionRcm: boolean;
     setIsCustomFunctionRcm: (custom: boolean) => void;
     isCustomDepartmentRcm: boolean;
@@ -40,6 +41,7 @@ export const RcmModal: React.FC<RcmModalProps> = ({
     allFunctions,
     allDepartments,
     riskCats,
+    allSystems,
     isCustomFunctionRcm,
     setIsCustomFunctionRcm,
     isCustomDepartmentRcm,
@@ -97,6 +99,52 @@ export const RcmModal: React.FC<RcmModalProps> = ({
 
                 <form onSubmit={handleCreateRcm}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', padding: '1.5rem' }}>
+                        <div className="detail-item">
+                            <label className="detail-label">Risk Title</label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                placeholder="Enter a brief risk title..."
+                                value={newRcm.risk_title || ''}
+                                onChange={e => setNewRcm({ ...newRcm, risk_title: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="detail-item">
+                            <label className="detail-label">Control Title</label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                placeholder="Enter a brief control title..."
+                                value={newRcm.control_title || ''}
+                                onChange={e => setNewRcm({ ...newRcm, control_title: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="detail-item" style={{ gridColumn: 'span 2' }}>
+                            <label className="detail-label">Risk Description</label>
+                            <textarea
+                                className="form-control"
+                                rows={2}
+                                required
+                                placeholder="Enter the risk scenario..."
+                                value={newRcm.risk_description}
+                                onChange={e => setNewRcm({ ...newRcm, risk_description: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="detail-item" style={{ gridColumn: 'span 2' }}>
+                            <label className="detail-label">Control Description</label>
+                            <textarea
+                                className="form-control"
+                                rows={2}
+                                required
+                                placeholder="Enter the mitigating control..."
+                                value={newRcm.control_description}
+                                onChange={e => setNewRcm({ ...newRcm, control_description: e.target.value })}
+                            />
+                        </div>
+
                         <div className="detail-item">
                             <label className="detail-label">Industry</label>
                             <select
@@ -194,30 +242,6 @@ export const RcmModal: React.FC<RcmModalProps> = ({
                             )}
                         </div>
 
-                        <div className="detail-item" style={{ gridColumn: 'span 2' }}>
-                            <label className="detail-label">Risk Description</label>
-                            <textarea
-                                className="form-control"
-                                rows={2}
-                                required
-                                placeholder="Enter the risk scenario..."
-                                value={newRcm.risk_description}
-                                onChange={e => setNewRcm({ ...newRcm, risk_description: e.target.value })}
-                            />
-                        </div>
-
-                        <div className="detail-item" style={{ gridColumn: 'span 2' }}>
-                            <label className="detail-label">Control Description</label>
-                            <textarea
-                                className="form-control"
-                                rows={2}
-                                required
-                                placeholder="Enter the mitigating control..."
-                                value={newRcm.control_description}
-                                onChange={e => setNewRcm({ ...newRcm, control_description: e.target.value })}
-                            />
-                        </div>
-
                         <div className="detail-item">
                             <label className="detail-label">Reference Standard</label>
                             <input
@@ -226,6 +250,18 @@ export const RcmModal: React.FC<RcmModalProps> = ({
                                 value={newRcm.reference_standard}
                                 onChange={e => setNewRcm({ ...newRcm, reference_standard: e.target.value })}
                             />
+                        </div>
+
+                        <div className="detail-item">
+                            <label className="detail-label">System / Application</label>
+                            <select
+                                className="form-control"
+                                value={newRcm.system_id || ''}
+                                onChange={e => setNewRcm({ ...newRcm, system_id: e.target.value || null })}
+                            >
+                                <option value="">Select System (Optional)...</option>
+                                {allSystems.map(s => <option key={s.system_id} value={s.system_id}>{s.system_name}</option>)}
+                            </select>
                         </div>
 
                         <div className="detail-item">

@@ -8,6 +8,7 @@ interface RcmViewProps {
         industry: string;
         function: string;
         department: string;
+        system: string;
         category: string;
         frequency: string;
     };
@@ -15,6 +16,7 @@ interface RcmViewProps {
     industries: any[];
     allFunctions: any[];
     allDepartments: any[];
+    allSystems: any[];
     riskCats: any[];
     rcmEntries: RCMEntry[];
     openEditRcmModal: (entry: RCMEntry) => void;
@@ -31,6 +33,7 @@ export const RcmView: React.FC<RcmViewProps> = ({
     industries,
     allFunctions,
     allDepartments,
+    allSystems,
     riskCats,
     rcmEntries,
     openEditRcmModal,
@@ -43,7 +46,7 @@ export const RcmView: React.FC<RcmViewProps> = ({
     return (
         <div className="rcm-view">
             {/* Filters Section */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) 140px 140px 140px 140px 140px auto', gap: '0.75rem', marginBottom: '1.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) 130px 130px 130px 130px 130px 130px auto', gap: '0.75rem', marginBottom: '1.5rem', alignItems: 'center' }}>
                 <div style={{ background: 'var(--glass-bg)', borderRadius: '0.75rem', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', padding: '0 0.75rem', height: '38px' }}>
                     <Search size={16} color="var(--text-secondary)" style={{ minWidth: '16px' }} />
                     <input
@@ -94,6 +97,14 @@ export const RcmView: React.FC<RcmViewProps> = ({
                 </select>
                 <select
                     className="form-control form-control-sm"
+                    value={rcmFilters.system}
+                    onChange={e => setRcmFilters({ ...rcmFilters, system: e.target.value })}
+                >
+                    <option value="all">Systems</option>
+                    {allSystems.map(s => <option key={s.system_id} value={s.system_id}>{s.system_name}</option>)}
+                </select>
+                <select
+                    className="form-control form-control-sm"
                     value={rcmFilters.category}
                     onChange={e => setRcmFilters({ ...rcmFilters, category: e.target.value })}
                 >
@@ -123,11 +134,14 @@ export const RcmView: React.FC<RcmViewProps> = ({
                             function_id: '',
                             department_id: '',
                             risk_category_id: '',
+                            risk_title: '',
                             risk_description: '',
+                            control_title: '',
                             control_description: '',
                             reference_standard: '',
                             control_type: 'Preventive',
-                            control_frequency: 'Continuous'
+                            control_frequency: 'Continuous',
+                            system_id: ''
                         })
                         setShowNewRcmModal(true)
                     }}
@@ -158,20 +172,23 @@ export const RcmView: React.FC<RcmViewProps> = ({
                                 const matchesIndustry = rcmFilters.industry === 'all' || entry.industry_id === rcmFilters.industry
                                 const matchesFunction = rcmFilters.function === 'all' || entry.function_id === rcmFilters.function
                                 const matchesDepartment = rcmFilters.department === 'all' || !rcmFilters.department || entry.department_id === rcmFilters.department
+                                const matchesSystem = rcmFilters.system === 'all' || !rcmFilters.system || entry.system_id === rcmFilters.system
                                 const matchesCategory = rcmFilters.category === 'all' || entry.risk_category_id === rcmFilters.category
                                 const matchesFrequency = rcmFilters.frequency === 'all' || entry.control_frequency === rcmFilters.frequency
-                                return matchesSearch && matchesIndustry && matchesFunction && matchesDepartment && matchesCategory && matchesFrequency
+                                return matchesSearch && matchesIndustry && matchesFunction && matchesDepartment && matchesSystem && matchesCategory && matchesFrequency
                             })
                             .map((entry) => (
                                 <tr key={entry.rcm_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                     <td style={{ padding: '1rem', verticalAlign: 'top' }}>
-                                        <div style={{ fontSize: '0.8rem', fontWeight: '500', color: 'var(--text-primary)' }}>{entry.functions?.function_name}</div>
-                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{entry.departments?.department_name}</div>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: '500', color: 'var(--accent-blue)' }}>{entry.functions?.function_name}</div>
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--accent-blue)', marginTop: '0.25rem' }}>{entry.departments?.department_name}</div>
                                     </td>
                                     <td style={{ padding: '1rem', verticalAlign: 'top' }}>
+                                        {entry.risk_title && <div style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--accent-blue)', marginBottom: '0.25rem' }}>{entry.risk_title}</div>}
                                         <div style={{ fontWeight: '500', fontSize: '0.9rem', lineHeight: '1.5' }}>{entry.risk_description}</div>
                                     </td>
                                     <td style={{ padding: '1rem', verticalAlign: 'top' }}>
+                                        {entry.control_title && <div style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--accent-blue)', marginBottom: '0.25rem' }}>{entry.control_title}</div>}
                                         <div style={{ fontSize: '0.875rem' }}>{entry.control_description}</div>
                                         {entry.reference_standard && <div style={{ fontSize: '0.7rem', color: 'var(--accent-blue)', marginTop: '0.25rem' }}>Ref: {entry.reference_standard}</div>}
                                     </td>

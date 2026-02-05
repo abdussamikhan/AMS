@@ -70,6 +70,7 @@ function App() {
     allFunctions,
     allDepartments,
     riskCats,
+    allSystems,
     rcmFilters,
     setRcmFilters,
     showNewRcmModal,
@@ -167,7 +168,9 @@ function App() {
     fetchAuditPlanningData,
     handleRcmAiGenerate,
     setIndustries,
-    setAllFunctions
+    setAllFunctions,
+    handleGenerateRiskRegisterPDF,
+    handleDownloadRiskRegisterCSV
   } = useAuditData(session)
 
   const [activeView, setActiveView] = useState<string>('overview')
@@ -267,6 +270,22 @@ function App() {
       obs.audit_procedures?.procedure_name?.toLowerCase().includes(searchQuery.toLowerCase())
     )
   }, [observations, searchQuery])
+
+  const filteredRiskRegisterEntries = useMemo(() => {
+    return riskRegisterEntries.filter(entry => {
+      const matchesSearch = !riskRegisterFilters.search ||
+        (entry.risk_title?.toLowerCase().includes(riskRegisterFilters.search.toLowerCase()) ||
+          entry.risk_description?.toLowerCase().includes(riskRegisterFilters.search.toLowerCase()) ||
+          entry.control_title?.toLowerCase().includes(riskRegisterFilters.search.toLowerCase()) ||
+          entry.control_description?.toLowerCase().includes(riskRegisterFilters.search.toLowerCase()));
+
+      const matchesCategory = riskRegisterFilters.category === 'all' || entry.risk_category_id === riskRegisterFilters.category;
+      const matchesOwner = riskRegisterFilters.owner === 'all' || entry.risk_owner === riskRegisterFilters.owner;
+      const matchesYear = riskRegisterFilters.year === 'all' || entry.fiscal_year.toString() === riskRegisterFilters.year;
+
+      return matchesSearch && matchesCategory && matchesOwner && matchesYear;
+    })
+  }, [riskRegisterEntries, riskRegisterFilters])
 
   const handleLogout = async () => {
     await handleSignOut()
@@ -408,9 +427,8 @@ function App() {
                       residual_likelihood: 2,
                       residual_impact: 2,
                       risk_owner: '',
-                      mitigation_strategy: 'Mitigate',
+                      audit_frequency: '12 months',
                       action_plan: '',
-                      status: 'Open',
                       fiscal_year: new Date().getFullYear(),
                       rcm_id: null
                     });
@@ -438,7 +456,13 @@ function App() {
             {(activeView === 'findings' || activeView === 'risk-register') && (
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button
-                  onClick={() => handleDownloadCSV(activeView === 'findings' ? observations : riskRegisterEntries as any)}
+                  onClick={() => {
+                    if (activeView === 'findings') {
+                      handleDownloadCSV(observations)
+                    } else {
+                      handleDownloadRiskRegisterCSV(filteredRiskRegisterEntries)
+                    }
+                  }}
                   style={{
                     background: 'var(--glass-bg)',
                     color: '#fff',
@@ -456,7 +480,13 @@ function App() {
                   Download CSV
                 </button>
                 <button
-                  onClick={() => handleGeneratePDF(observations, stats, profile, session?.user?.email)}
+                  onClick={() => {
+                    if (activeView === 'findings') {
+                      handleGeneratePDF(observations, stats, profile, session?.user?.email)
+                    } else {
+                      handleGenerateRiskRegisterPDF(filteredRiskRegisterEntries, profile, riskRegisterFilters.year, session?.user?.email)
+                    }
+                  }}
                   style={{
                     background: 'var(--glass-bg)',
                     color: '#fff',
@@ -610,6 +640,7 @@ function App() {
               industries={industries}
               allFunctions={allFunctions}
               allDepartments={allDepartments}
+              allSystems={allSystems}
               riskCats={riskCats}
               rcmEntries={rcmEntries}
               openEditRcmModal={openEditRcmModal}
@@ -722,6 +753,7 @@ function App() {
         allFunctions={allFunctions}
         allDepartments={allDepartments}
         riskCats={riskCats}
+        allSystems={allSystems}
         isCustomFunctionRcm={isCustomFunctionRcm}
         setIsCustomFunctionRcm={setIsCustomFunctionRcm}
         isCustomDepartmentRcm={isCustomDepartmentRcm}

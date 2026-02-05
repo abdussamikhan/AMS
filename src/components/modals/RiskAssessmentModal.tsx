@@ -44,36 +44,6 @@ export const RiskAssessmentModal: React.FC<RiskAssessmentModalProps> = ({
                 <form onSubmit={handleSaveRisk} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                         <div className="detail-item">
-                            <label className="detail-label">Source from RCM (Optional)</label>
-                            <select
-                                className="form-control"
-                                value={newRiskEntry.rcm_id || ''}
-                                onChange={e => {
-                                    const rcmId = e.target.value;
-                                    const rcmEntry = rcmEntries.find(r => r.rcm_id === rcmId);
-                                    if (rcmEntry) {
-                                        setNewRiskEntry({
-                                            ...newRiskEntry,
-                                            rcm_id: rcmId,
-                                            risk_title: rcmEntry.risk_description.substring(0, 50),
-                                            risk_description: rcmEntry.risk_description,
-                                            risk_category_id: rcmEntry.risk_category_id,
-                                            action_plan: `Source Control: ${rcmEntry.control_description}`
-                                        });
-                                    } else {
-                                        setNewRiskEntry({ ...newRiskEntry, rcm_id: null });
-                                    }
-                                }}
-                            >
-                                <option value="">-- Manual Entry --</option>
-                                {rcmEntries.map(rcm => (
-                                    <option key={rcm.rcm_id} value={rcm.rcm_id}>
-                                        {rcm.risk_description.substring(0, 60)}...
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="detail-item">
                             <label className="detail-label">Risk Category</label>
                             <select
                                 className="form-control"
@@ -85,10 +55,57 @@ export const RiskAssessmentModal: React.FC<RiskAssessmentModalProps> = ({
                                 {riskCats.map(cat => <option key={cat.risk_id} value={cat.risk_id}>{cat.category_name}</option>)}
                             </select>
                         </div>
+                        <div className="detail-item">
+                            <label className="detail-label">Fiscal Year</label>
+                            <select
+                                className="form-control"
+                                value={newRiskEntry.fiscal_year}
+                                onChange={e => setNewRiskEntry({ ...newRiskEntry, fiscal_year: parseInt(e.target.value) })}
+                            >
+                                {[...Array(5)].map((_, i) => (
+                                    <option key={i} value={new Date().getFullYear() - 1 + i}>
+                                        {new Date().getFullYear() - 1 + i} FY
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     <div className="detail-item">
-                        <label className="detail-label">Risk Title</label>
+                        <label className="detail-label">Source from RCM (Optional)</label>
+                        <select
+                            className="form-control"
+                            value={newRiskEntry.rcm_id || ''}
+                            onChange={e => {
+                                const rcmId = e.target.value;
+                                const rcmEntry = rcmEntries.find(r => r.rcm_id === rcmId);
+                                if (rcmEntry) {
+                                    setNewRiskEntry({
+                                        ...newRiskEntry,
+                                        rcm_id: rcmId,
+                                        risk_title: rcmEntry.risk_title || rcmEntry.risk_description.substring(0, 50),
+                                        risk_description: rcmEntry.risk_description,
+                                        control_title: rcmEntry.control_title || '',
+                                        control_description: rcmEntry.control_description || '',
+                                        risk_category_id: rcmEntry.risk_category_id,
+                                        action_plan: `Source Control: ${rcmEntry.control_description}`
+                                    });
+                                } else {
+                                    setNewRiskEntry({ ...newRiskEntry, rcm_id: null });
+                                }
+                            }}
+                        >
+                            <option value="">-- Manual Entry --</option>
+                            {rcmEntries.map(rcm => (
+                                <option key={rcm.rcm_id} value={rcm.rcm_id}>
+                                    {rcm.risk_title || rcm.risk_description.substring(0, 60) + '...'}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
+                        <label className="detail-label" style={{ marginBottom: '0.75rem', display: 'block' }}>Risk Title & Description</label>
                         <input
                             type="text"
                             className="form-control"
@@ -96,18 +113,34 @@ export const RiskAssessmentModal: React.FC<RiskAssessmentModalProps> = ({
                             placeholder="e.g. Unauthorized access to production database"
                             value={newRiskEntry.risk_title}
                             onChange={e => setNewRiskEntry({ ...newRiskEntry, risk_title: e.target.value })}
+                            style={{ marginBottom: '0.75rem', fontWeight: '600', color: 'var(--accent-blue)' }}
                         />
-                    </div>
-
-                    <div className="detail-item">
-                        <label className="detail-label">Risk Description</label>
                         <textarea
                             className="form-control"
-                            rows={3}
+                            rows={2}
                             required
                             placeholder="Detailed description of the risk scenario..."
                             value={newRiskEntry.risk_description}
                             onChange={e => setNewRiskEntry({ ...newRiskEntry, risk_description: e.target.value })}
+                        />
+                    </div>
+
+                    <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
+                        <label className="detail-label" style={{ marginBottom: '0.75rem', display: 'block' }}>Control Title & Description</label>
+                        <input
+                            type="text"
+                            className="form-control"
+                            placeholder="e.g. Access Control Policy"
+                            value={newRiskEntry.control_title || ''}
+                            onChange={e => setNewRiskEntry({ ...newRiskEntry, control_title: e.target.value })}
+                            style={{ marginBottom: '0.75rem', fontWeight: '600', color: 'var(--accent-blue)' }}
+                        />
+                        <textarea
+                            className="form-control"
+                            rows={2}
+                            placeholder="Describe the mitigating control activity..."
+                            value={newRiskEntry.control_description || ''}
+                            onChange={e => setNewRiskEntry({ ...newRiskEntry, control_description: e.target.value })}
                         />
                     </div>
 
@@ -183,7 +216,7 @@ export const RiskAssessmentModal: React.FC<RiskAssessmentModalProps> = ({
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 140px', gap: '1.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
                         <div className="detail-item">
                             <label className="detail-label">Risk Owner</label>
                             <input
@@ -195,42 +228,43 @@ export const RiskAssessmentModal: React.FC<RiskAssessmentModalProps> = ({
                             />
                         </div>
                         <div className="detail-item">
-                            <label className="detail-label">Mitigation Strategy</label>
+                            <label className="detail-label">Audit Frequency</label>
                             <select
                                 className="form-control"
-                                value={newRiskEntry.mitigation_strategy}
-                                onChange={e => setNewRiskEntry({ ...newRiskEntry, mitigation_strategy: e.target.value as any })}
+                                value={newRiskEntry.audit_frequency || '12 months'}
+                                onChange={e => setNewRiskEntry({ ...newRiskEntry, audit_frequency: e.target.value })}
                             >
-                                <option value="Mitigate">Mitigate</option>
-                                <option value="Accept">Accept</option>
-                                <option value="Transfer">Transfer</option>
-                                <option value="Avoid">Avoid</option>
+                                <option value="3 months">3 months</option>
+                                <option value="6 months">6 months</option>
+                                <option value="12 months">12 months</option>
+                                <option value="18 months">18 months</option>
+                                <option value="24 months">24 months</option>
+                                <option value="36 months">36 months</option>
+                                <option value="Continuous">Continuous</option>
                             </select>
                         </div>
                         <div className="detail-item">
-                            <label className="detail-label">Fiscal Year</label>
-                            <select
+                            <label className="detail-label">Target Residual Score</label>
+                            <input
+                                type="number"
                                 className="form-control"
-                                value={newRiskEntry.fiscal_year}
-                                onChange={e => setNewRiskEntry({ ...newRiskEntry, fiscal_year: parseInt(e.target.value) })}
-                            >
-                                {[...Array(5)].map((_, i) => (
-                                    <option key={i} value={new Date().getFullYear() - 1 + i}>
-                                        {new Date().getFullYear() - 1 + i} FY
-                                    </option>
-                                ))}
-                            </select>
+                                min="1"
+                                max="25"
+                                placeholder="1-25"
+                                value={newRiskEntry.target_residual_score || ''}
+                                onChange={e => setNewRiskEntry({ ...newRiskEntry, target_residual_score: parseInt(e.target.value) || 0 })}
+                            />
                         </div>
                     </div>
 
                     <div className="detail-item">
-                        <label className="detail-label">Action Plan / Next Steps</label>
+                        <label className="detail-label">Remarks</label>
                         <textarea
                             className="form-control"
                             rows={2}
-                            placeholder="Describe planned mitigations and control measures..."
-                            value={newRiskEntry.action_plan}
-                            onChange={e => setNewRiskEntry({ ...newRiskEntry, action_plan: e.target.value })}
+                            placeholder="Additional notes or comments..."
+                            value={newRiskEntry.remarks || ''}
+                            onChange={e => setNewRiskEntry({ ...newRiskEntry, remarks: e.target.value })}
                         />
                     </div>
 

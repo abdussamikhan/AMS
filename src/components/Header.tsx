@@ -27,7 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
     const getHeaderTitle = () => {
         switch (activeView) {
             case 'overview': return 'Audit Overview'
-            case 'rcm': return 'Risk Control Matrix'
+            case 'rcm': return 'Risk Control Catalogue'
             case 'audit-planning': return 'Audit Planning'
             case 'risk-register': return 'Risk Register'
             case 'analytics': return 'Data Analytics'

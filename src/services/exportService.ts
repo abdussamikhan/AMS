@@ -25,6 +25,33 @@ export const downloadCSV = (filteredObservations: Observation[]) => {
     link.style.visibility = 'hidden'
     document.body.appendChild(link)
     link.click()
+    link.click()
+    document.body.removeChild(link)
+}
+
+export const downloadRiskRegisterCSV = (entries: any[]) => {
+    const headers = ["Risk Title", "Risk Description", "Category", "Owner", "Inherent Score", "Residual Score", "Control Title", "Control Description", "Fiscal Year"]
+    const rows = entries.map(entry => [
+        `"${(entry.risk_title || "").replace(/"/g, '""')}"`,
+        `"${(entry.risk_description || "").replace(/"/g, '""')}"`,
+        `"${(entry.risk_categories?.category_name || "Uncategorized").replace(/"/g, '""')}"`,
+        `"${(entry.risk_owner || "Unassigned").replace(/"/g, '""')}"`,
+        `${entry.inherent_likelihood * entry.inherent_impact}`,
+        `${entry.residual_likelihood * entry.residual_impact}`,
+        `"${(entry.control_title || "").replace(/"/g, '""')}"`,
+        `"${(entry.control_description || "").replace(/"/g, '""')}"`,
+        `${entry.fiscal_year}`
+    ])
+
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n")
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `Risk_Register_${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
     document.body.removeChild(link)
 }
 
@@ -206,4 +233,65 @@ export const generateDetailedPDF = (obs: Observation, profile: Profile | null, u
     }
 
     doc.save(`AuditAce_Detailed_Finding_${obs.observation_id.slice(0, 8)}.pdf`)
+}
+
+export const generateRiskRegisterPDF = (
+    entries: any[], // Using any[] to avoid circular dependency or import issues if RiskRegisterEntry isn't readily available in types
+    profile: Profile | null,
+    fiscalYear: string,
+    userEmail?: string
+) => {
+    const doc = new jsPDF('landscape')
+    const timestamp = new Date().toISOString().split('T')[0] + ' ' + new Date().toTimeString().split(' ')[0]
+
+    doc.setFontSize(22)
+    doc.setTextColor(41, 128, 185)
+    doc.text('Audit Management System', 14, 22)
+    doc.setFontSize(14)
+    doc.setTextColor(100)
+    doc.text(`Risk Register Report - FY ${fiscalYear}`, 14, 30)
+
+    doc.setFontSize(10)
+    doc.text(`Generated: ${timestamp}`, 14, 38)
+    doc.text(`User: ${profile?.full_name || userEmail || 'Unknown'}`, 14, 43)
+
+    const tableRows = entries.map((entry, index) => [
+        index + 1,
+        entry.risk_title,
+        entry.risk_description?.substring(0, 150) + (entry.risk_description?.length > 150 ? '...' : ''),
+        (entry.control_description || entry.control_title || '').substring(0, 150) + '...',
+        entry.risk_categories?.category_name || 'Uncategorized',
+        entry.risk_owner || 'Unassigned',
+        `${entry.inherent_likelihood * entry.inherent_impact}`,
+        `${entry.residual_likelihood * entry.residual_impact}`
+    ])
+
+    autoTable(doc, {
+        startY: 50,
+        head: [['#', 'Risk Title', 'Risk Description', 'Control Description', 'Category', 'Owner', 'Inherent', 'Residual']],
+        body: tableRows,
+        theme: 'grid',
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', halign: 'center' },
+        styles: { fontSize: 8, cellPadding: 3, valign: 'middle' },
+        columnStyles: {
+            0: { cellWidth: 10, halign: 'center' },
+            1: { cellWidth: 40 }, // Risk Title
+            2: { cellWidth: 70 }, // Risk Description
+            3: { cellWidth: 70 }, // Control Description
+            4: { cellWidth: 25, halign: 'center' },
+            5: { cellWidth: 25, halign: 'center' },
+            6: { cellWidth: 15, halign: 'center' },
+            7: { cellWidth: 15, halign: 'center' }
+        }
+    })
+
+    const pageCount = (doc as any).internal.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+        doc.setFontSize(8)
+        doc.setTextColor(150)
+        doc.text(`Page ${i} of ${pageCount} - Confidential AuditAce Risk Register`, 14, 200)
+    }
+
+    doc.save(`AuditAce_Risk_Register_${new Date().toISOString().split('T')[0]}.pdf`)
 }

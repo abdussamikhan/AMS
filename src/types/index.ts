@@ -23,6 +23,10 @@ export type RCMEntry = Database['public']['Tables']['risk_control_matrix']['Row'
     functions?: { function_name: string }
     departments?: { department_name: string }
     risk_categories?: { category_name: string }
+    systems?: { system_name: string }
+    system_id?: string | null
+    risk_title?: string | null
+    control_title?: string | null
 }
 
 export type RiskRegisterEntry = {
@@ -38,9 +42,12 @@ export type RiskRegisterEntry = {
     residual_impact: number
     residual_score: number
     risk_owner: string
-    mitigation_strategy: 'Accept' | 'Mitigate' | 'Transfer' | 'Avoid'
+    audit_frequency: string
+    target_residual_score?: number
+    remarks?: string
+    control_title?: string
+    control_description?: string
     action_plan: string
-    status: 'Open' | 'In Progress' | 'Mitigated' | 'Closed'
     fiscal_year: number
     created_by: string
     created_at: string
