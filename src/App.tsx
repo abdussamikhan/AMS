@@ -264,6 +264,7 @@ function App() {
         fetchAuditPlanningData()
         fetchAuditors()
         fetchRefDocs()
+        fetchRiskRegister()
       }
       else setProfile(null)
       setIsAppLoading(false)
@@ -2771,7 +2772,7 @@ function App() {
           </div>
         ) : activeView === 'risk-register' ? (
           <div className="risk-register-view">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px 180px 140px', gap: '1rem', marginBottom: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px 180px 140px auto', gap: '1rem', marginBottom: '2rem' }}>
               <div style={{ background: 'var(--glass-bg)', borderRadius: '0.75rem', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', padding: '0 1rem', height: '42px' }}>
                 <Search size={18} color="var(--text-secondary)" style={{ minWidth: '18px' }} />
                 <input
@@ -2788,7 +2789,7 @@ function App() {
                 onChange={e => setRiskRegisterFilters({ ...riskRegisterFilters, category: e.target.value })}
               >
                 <option value="all">All Categories</option>
-                {riskCats.map(cat => <option key={cat.category_id} value={cat.category_id}>{cat.category_name}</option>)}
+                {riskCats.map(cat => <option key={cat.risk_id} value={cat.risk_id}>{cat.category_name}</option>)}
               </select>
               <select
                 className="form-control"
@@ -2811,6 +2812,32 @@ function App() {
                   return <option key={y} value={y}>{y} FY</option>
                 })}
               </select>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setIsEditingRisk(false);
+                  setCurrentRiskId(null);
+                  setNewRiskEntry({
+                    risk_title: '',
+                    risk_description: '',
+                    risk_category_id: '',
+                    inherent_likelihood: 3,
+                    inherent_impact: 3,
+                    residual_likelihood: 2,
+                    residual_impact: 2,
+                    risk_owner: '',
+                    mitigation_strategy: 'Mitigate',
+                    action_plan: '',
+                    status: 'Open',
+                    fiscal_year: new Date().getFullYear(),
+                    rcm_id: null
+                  });
+                  setShowNewRiskModal(true);
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap', height: '42px', padding: '0 1.25rem' }}
+              >
+                <Plus size={18} /> New Risk Assessment
+              </button>
             </div>
 
             <div style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
@@ -3854,7 +3881,7 @@ function App() {
                       onChange={e => setNewRiskEntry({ ...newRiskEntry, risk_category_id: e.target.value })}
                     >
                       <option value="">Select Category...</option>
-                      {riskCats.map(cat => <option key={cat.category_id} value={cat.category_id}>{cat.category_name}</option>)}
+                      {riskCats.map(cat => <option key={cat.risk_id} value={cat.risk_id}>{cat.category_name}</option>)}
                     </select>
                   </div>
                 </div>
