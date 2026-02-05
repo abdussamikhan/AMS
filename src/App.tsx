@@ -3096,7 +3096,7 @@ function App() {
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary" style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', padding: '0.6rem 2rem', borderRadius: '0.5rem', fontWeight: '600', cursor: 'pointer' }}>
-                    Create Control Entry
+                    Create
                   </button>
                 </div>
               </form>
