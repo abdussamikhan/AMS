@@ -298,7 +298,7 @@ export const RcmModal: React.FC<RcmModalProps> = ({
                     </div>
 
                     <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                        <button type="button" className="btn btn-secondary" onClick={() => setShowNewRcmModal(false)} style={{ background: 'transparent', border: '1px solid var(--border-color)', color: '#fff', padding: '0.6rem 1.5rem', borderRadius: '0.5rem', cursor: 'pointer' }}>
+                        <button type="button" className="btn btn-secondary" onClick={() => setShowNewRcmModal(false)} style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '0.6rem 1.5rem', borderRadius: '0.5rem', cursor: 'pointer' }}>
                             Cancel
                         </button>
                         <button type="submit" className="btn btn-primary" style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', padding: '0.6rem 2rem', borderRadius: '0.5rem', fontWeight: '600', cursor: 'pointer' }}>

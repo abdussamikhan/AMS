@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import type { Database } from '../types/supabase'
-import type { Observation, Notification, RCMEntry, RiskRegisterEntry, Profile } from '../types'
+import type { Observation, Notification, RCMEntry, RiskRegisterEntry, Profile, AuditProgram } from '../types'
 import { invokeAiProcessRcm, invokeAiProcessAuditFinding } from '../services/aiService'
 import { downloadCSV, generatePDF, generateDetailedPDF, generateRiskRegisterPDF, downloadRiskRegisterCSV } from '../services/exportService'
 
@@ -13,7 +13,8 @@ export const useAuditData = (session: any) => {
         total: 0,
         critical: 0,
         high: 0,
-        medium: 0
+        medium: 0,
+        totalRisks: 0
     })
     const [notifications, setNotifications] = useState<Notification[]>([])
     const [showNotifications, setShowNotifications] = useState(false)
@@ -65,6 +66,11 @@ export const useAuditData = (session: any) => {
         control_frequency: 'Continuous' as any,
         system_id: ''
     })
+
+    // Audit Program State
+    const [auditPrograms, setAuditPrograms] = useState<AuditProgram[]>([])
+    const [selectedProgram, setSelectedProgram] = useState<AuditProgram | null>(null)
+    const [isProgramLoading, setIsProgramLoading] = useState(false)
 
     // Audit Planning & Scheduling State
     const [auditPlans, setAuditPlans] = useState<any[]>([])
@@ -304,6 +310,205 @@ export const useAuditData = (session: any) => {
         if (data) setRiskRegisterEntries(data as any[])
     }
 
+    const fetchAuditPrograms = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('audit_programs')
+                .select(`
+                    *,
+                    audits (audit_title)
+                `)
+                .order('created_at', { ascending: false })
+            if (error) throw error
+            setAuditPrograms(data as any[])
+        } catch (err) {
+            console.error('Error fetching audit programs:', err)
+        }
+    }
+
+    const fetchProgramDetails = async (programId: string) => {
+        setIsProgramLoading(true)
+        try {
+            const { data, error } = await supabase
+                .from('audit_programs')
+                .select(`
+                    *,
+                    audits (audit_title),
+                    tests:audit_program_tests (
+                        *,
+                        risk_register (*),
+                        procedures:audit_program_procedures (*)
+                    )
+                `)
+                .eq('id', programId)
+                .single()
+            if (error) throw error
+            setSelectedProgram(data as any)
+        } catch (err) {
+            console.error('Error fetching program details:', err)
+        } finally {
+            setIsProgramLoading(false)
+        }
+    }
+
+    const createAuditProgram = async (auditId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('audit_programs')
+                .insert([{ audit_id: auditId, status: 'Draft' }])
+                .select()
+                .single()
+            if (error) throw error
+            fetchAuditPrograms()
+            return data
+        } catch (err: any) {
+            alert('Error creating audit program: ' + err.message)
+        }
+    }
+
+    const addTestToProgram = async (programId: string, riskId: string) => {
+        try {
+            const { error } = await supabase
+                .from('audit_program_tests')
+                .insert([{ program_id: programId, risk_register_id: riskId }])
+            if (error) throw error
+
+            // Trigger Rule 9 rollup for this risk
+            const { data: newTest } = await supabase
+                .from('audit_program_tests')
+                .select('id')
+                .eq('program_id', programId)
+                .eq('risk_register_id', riskId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (newTest) {
+                await updateProcedureStatus('', 'Pending', newTest.id); // Hack to trigger rollups
+            } else {
+                fetchProgramDetails(programId);
+            }
+        } catch (err: any) {
+            alert('Error adding test: ' + err.message)
+        }
+    }
+
+    const addProcedureToTest = async (testId: string, procedureName: string, description: string, evidenceRequirements: string) => {
+        try {
+            const { error } = await supabase
+                .from('audit_program_procedures')
+                .insert([{ test_id: testId, procedure_name: procedureName, description, evidence_requirements: evidenceRequirements }])
+            if (error) throw error
+
+            // Trigger Rule 8 rollup
+            await updateProcedureStatus('', 'Pending', testId); // Pass empty ID to just trigger rollup
+        } catch (err: any) {
+            alert('Error adding procedure: ' + err.message)
+        }
+    }
+
+    const updateProcedureStatus = async (procedureId: string, status: 'Pending' | 'Passed' | 'Failed', testId: string) => {
+        try {
+            // 1. Update Procedure (if ID provided)
+            if (procedureId) {
+                const { error: pError } = await supabase
+                    .from('audit_program_procedures')
+                    .update({ status })
+                    .eq('id', procedureId)
+                if (pError) throw pError
+            }
+
+            // 2. Fetch all procedures for this test to rollup Rule 8
+            const { data: procedures, error: fetchError } = await supabase
+                .from('audit_program_procedures')
+                .select('status')
+                .eq('test_id', testId)
+            if (fetchError) throw fetchError
+
+            // 3. Calculate Rule 8 rollup status
+            let controlStatus: 'Implemented' | 'Partially Implemented' | 'Not Implemented' = 'Not Implemented'
+            if (procedures && procedures.length > 0) {
+                const passed = procedures.filter(p => p.status === 'Passed').length
+                const failed = procedures.filter(p => p.status === 'Failed').length
+                const total = procedures.length
+
+                if (passed === total) {
+                    controlStatus = 'Implemented'
+                } else if (passed > 0 && failed > 0) {
+                    controlStatus = 'Partially Implemented'
+                } else if (failed === total) {
+                    controlStatus = 'Not Implemented'
+                } else if (passed > 0) {
+                    controlStatus = 'Partially Implemented'
+                } else {
+                    controlStatus = 'Not Implemented'
+                }
+            }
+
+            // 4. Update Test with new control status
+            const { error: tError } = await supabase
+                .from('audit_program_tests')
+                .update({ control_status: controlStatus })
+                .eq('id', testId)
+            if (tError) throw tError
+
+            // 5. Rule 9 Rollup: All tests in this program for the same risk title
+            const { data: currentTest, error: ctError } = await supabase
+                .from('audit_program_tests')
+                .select(`
+                    program_id,
+                    risk_register (risk_title)
+                `)
+                .eq('id', testId)
+                .single()
+            if (ctError) throw ctError
+
+            const riskTitle = (currentTest.risk_register as any)?.risk_title
+            const programId = currentTest.program_id
+
+            if (riskTitle && programId) {
+                const { data: allProgramTests, error: aptError } = await supabase
+                    .from('audit_program_tests')
+                    .select(`
+                        id,
+                        control_status,
+                        risk_register (risk_title)
+                    `)
+                    .eq('program_id', programId)
+                if (aptError) throw aptError
+
+                const riskSiblings = allProgramTests.filter((t: any) => t.risk_register?.risk_title === riskTitle)
+
+                // Rule 9 Calculation
+                let riskStatus: 'Mitigated' | 'Partially Mitigated' | 'Not Mitigated' = 'Not Mitigated'
+                const imp = riskSiblings.filter(t => t.control_status === 'Implemented').length
+                const totalSiblings = riskSiblings.length
+
+                if (imp === totalSiblings && totalSiblings > 0) {
+                    riskStatus = 'Mitigated'
+                } else if (imp > 0) {
+                    riskStatus = 'Partially Mitigated'
+                } else {
+                    riskStatus = 'Not Mitigated'
+                }
+
+                // Update all sibling tests within THIS program that share the same risk title
+                const siblingIds = riskSiblings.map(t => t.id)
+                if (siblingIds.length > 0) {
+                    const { error: updateRiskError } = await supabase
+                        .from('audit_program_tests')
+                        .update({ risk_status: riskStatus })
+                        .in('id', siblingIds)
+                    if (updateRiskError) throw updateRiskError
+                }
+            }
+
+            if (selectedProgram) fetchProgramDetails(selectedProgram.id)
+        } catch (err: any) {
+            alert('Error updating status: ' + err.message)
+        }
+    }
+
     const fetchData = async () => {
         try {
             setIsDataLoading(true)
@@ -331,7 +536,8 @@ export const useAuditData = (session: any) => {
                     total: data.length,
                     critical: data.filter(o => o.risk_rating === 'Critical').length,
                     high: data.filter(o => o.risk_rating === 'High').length,
-                    medium: data.filter(o => o.risk_rating === 'Medium').length
+                    medium: data.filter(o => o.risk_rating === 'Medium').length,
+                    totalRisks: stats.totalRisks
                 }
                 setStats(summary)
             }
@@ -645,6 +851,10 @@ export const useAuditData = (session: any) => {
     }
 
     useEffect(() => {
+        setStats(prev => ({ ...prev, totalRisks: riskRegisterEntries.length }))
+    }, [riskRegisterEntries])
+
+    useEffect(() => {
         if (session) {
             fetchData()
             fetchProcedures()
@@ -655,6 +865,7 @@ export const useAuditData = (session: any) => {
             fetchAuditors()
             fetchRefDocs()
             fetchRiskRegister()
+            fetchAuditPrograms()
 
             const channel = supabase
                 .channel('realtime_notifications')
@@ -672,6 +883,22 @@ export const useAuditData = (session: any) => {
             }
         }
     }, [session])
+
+    const toggleIssueObservation = async (testId: string, issue: boolean) => {
+        try {
+            const { error } = await supabase
+                .from('audit_program_tests')
+                .update({ issue_observation: issue })
+                .eq('id', testId)
+            if (error) throw error
+
+            if (selectedProgram) fetchProgramDetails(selectedProgram.id)
+            return true
+        } catch (err: any) {
+            alert('Error updating observation toggle: ' + err.message)
+            return false
+        }
+    }
 
     return {
         isDataLoading,
@@ -765,6 +992,10 @@ export const useAuditData = (session: any) => {
         setRcmAiInput,
         isAIProcessing,
         isRcmAiProcessing,
+        auditPrograms,
+        selectedProgram,
+        setSelectedProgram,
+        isProgramLoading,
         fetchData,
         fetchProcedures,
         fetchNotifications,
@@ -775,6 +1006,13 @@ export const useAuditData = (session: any) => {
         fetchAuditors,
         fetchRefDocs,
         fetchRiskRegister,
+        fetchAuditPrograms,
+        fetchProgramDetails,
+        createAuditProgram,
+        addTestToProgram,
+        addProcedureToTest,
+        updateProcedureStatus,
+        toggleIssueObservation,
         handleRcmAiGenerate,
         processWithAI,
         openEditRcmModal,

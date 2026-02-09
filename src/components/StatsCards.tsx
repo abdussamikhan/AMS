@@ -6,6 +6,7 @@ interface StatsCardsProps {
         critical: number
         high: number
         medium: number
+        totalRisks?: number
     }
 }
 

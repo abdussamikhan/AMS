@@ -8,6 +8,8 @@ interface AuditPlanningViewProps {
     audits: any[];
     setActiveView: (view: string) => void;
     setSearchQuery: (query: string) => void;
+    createAuditProgram: (auditId: string) => Promise<any>;
+    auditPrograms: any[];
 }
 
 export const AuditPlanningView: React.FC<AuditPlanningViewProps> = ({
@@ -16,8 +18,13 @@ export const AuditPlanningView: React.FC<AuditPlanningViewProps> = ({
     setSelectedPlanId,
     audits,
     setActiveView,
-    setSearchQuery
+    setSearchQuery,
+    createAuditProgram,
+    auditPrograms
 }) => {
+    const getProgramForAudit = (auditId: string) => {
+        return auditPrograms.find(p => p.audit_id === auditId);
+    };
     return (
         <div className="audit-planning-view">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -74,13 +81,35 @@ export const AuditPlanningView: React.FC<AuditPlanningViewProps> = ({
                                                 <UserIcon size={14} /> {audit.profiles?.full_name || 'Unassigned'}
                                             </div>
                                         </div>
-                                        <button
-                                            className="btn btn-secondary"
-                                            style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
-                                            onClick={() => { setActiveView('findings'); setSearchQuery(audit.audit_title); }}
-                                        >
-                                            View Findings
-                                        </button>
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <button
+                                                className="btn btn-secondary"
+                                                style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
+                                                onClick={() => { setActiveView('findings'); setSearchQuery(audit.audit_title); }}
+                                            >
+                                                Findings
+                                            </button>
+                                            {getProgramForAudit(audit.audit_id) ? (
+                                                <button
+                                                    className="btn btn-secondary"
+                                                    style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem', borderColor: 'var(--accent-blue)', color: 'var(--accent-blue)' }}
+                                                    onClick={() => { setActiveView('audit-program'); }}
+                                                >
+                                                    Open Program
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    className="btn btn-primary"
+                                                    style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
+                                                    onClick={async () => {
+                                                        await createAuditProgram(audit.audit_id);
+                                                        setActiveView('audit-program');
+                                                    }}
+                                                >
+                                                    Start Program
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             ))

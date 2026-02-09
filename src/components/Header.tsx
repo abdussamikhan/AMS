@@ -1,5 +1,4 @@
-import React from 'react'
-import { Bell, X, Clock } from 'lucide-react'
+import { Bell, Clock, Sun, Moon } from 'lucide-react'
 import { supabase } from '../supabase'
 import type { Notification } from '../types'
 
@@ -11,6 +10,8 @@ interface HeaderProps {
     setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>
     markAsRead: (id: string) => void
     session: any
+    theme: 'light' | 'dark'
+    toggleTheme: () => void
     children?: React.ReactNode
 }
 
@@ -22,18 +23,23 @@ export const Header: React.FC<HeaderProps> = ({
     setNotifications,
     markAsRead,
     session,
+    theme,
+    toggleTheme,
     children
 }) => {
     const getHeaderTitle = () => {
         switch (activeView) {
             case 'overview': return 'Audit Overview'
             case 'rcm': return 'Risk Control Catalogue'
-            case 'audit-planning': return 'Audit Planning'
+            case 'risk-assessment': return 'Risk Assessment'
+            case 'audit-planning': return 'Audit Plan'
             case 'risk-register': return 'Risk Register'
             case 'analytics': return 'Data Analytics'
             case 'admin-setup': return 'Organization Setup'
             case 'admin-references': return 'Reference Documents'
             case 'admin-templates': return 'Audit Templates'
+            case 'admin': return 'System Administration'
+            case 'audit-program': return 'Audit Program'
             default: return 'Audit Observations'
         }
     }
@@ -42,12 +48,15 @@ export const Header: React.FC<HeaderProps> = ({
         switch (activeView) {
             case 'overview': return 'High-level risk distribution and analytics'
             case 'rcm': return 'Map risks to internal controls across the organization'
+            case 'risk-assessment': return 'Comprehensive risk identification and control mapping'
             case 'risk-register': return 'Identify, assess, and monitor organizational risks'
             case 'audit-planning': return 'Manage annual audit plans and schedule engagements'
             case 'analytics': return 'Advanced insights and trends across audit observations and controls'
             case 'admin-setup': return 'Manage industries, functions, and departments'
             case 'admin-references': return 'Upload and manage reference documents, standards, and policies'
             case 'admin-templates': return 'Upload and manage audit report templates'
+            case 'admin': return 'Setup of System Parameters and Templates'
+            case 'audit-program': return 'Manage audit test procedures and automated status rollups'
             default: return 'Detailed list of organizational audit observations'
         }
     }
@@ -58,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
     }
 
     return (
-        <header className="header" style={{ marginBottom: (activeView === 'findings' || activeView === 'risk-register') ? '2rem' : '3rem' }}>
+        <header className="header" style={{ marginBottom: (activeView === 'findings' || activeView === 'risk-register' || activeView === 'risk-assessment') ? '2rem' : '3rem' }}>
             <div>
                 <h1>{getHeaderTitle()}</h1>
                 <p style={{ color: 'var(--text-secondary)' }}>{getHeaderSubtitle()}</p>
@@ -77,7 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
                             padding: '2px 5px',
                             borderRadius: '10px',
                             fontWeight: '700',
-                            border: '2px solid #1a1f26'
+                            border: '2px solid var(--bg-color)'
                         }}>
                             {notifications.filter(n => !n.is_read).length}
                         </span>
@@ -90,10 +99,10 @@ export const Header: React.FC<HeaderProps> = ({
                             right: '0',
                             width: '320px',
                             maxHeight: '450px',
-                            background: '#1a1f26',
+                            background: 'var(--dropdown-bg)',
                             border: '1px solid var(--border-color)',
                             borderRadius: '0.75rem',
-                            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
+                            boxShadow: '0 20px 25px -5px var(--shadow-color)',
                             zIndex: 1000,
                             overflow: 'hidden',
                             display: 'flex',
@@ -130,7 +139,7 @@ export const Header: React.FC<HeaderProps> = ({
                                                 width: '8px', height: '8px', borderRadius: '50%', background: n.is_read ? 'transparent' : 'var(--accent-blue)', marginTop: '6px'
                                             }} />
                                             <div style={{ flex: 1 }}>
-                                                <div style={{ fontWeight: '600', fontSize: '0.875rem', color: n.is_read ? 'var(--text-secondary)' : '#fff' }}>{n.title}</div>
+                                                <div style={{ fontWeight: '600', fontSize: '0.875rem', color: n.is_read ? 'var(--text-secondary)' : 'var(--text-primary)' }}>{n.title}</div>
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{n.message}</div>
                                                 <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                                                     <Clock size={10} /> {n.created_at ? new Date(n.created_at).toISOString().split('T')[1].substring(0, 5) : '--:--'}
@@ -142,6 +151,25 @@ export const Header: React.FC<HeaderProps> = ({
                             </div>
                         </div>
                     )}
+                </div>
+
+                <div
+                    onClick={toggleTheme}
+                    style={{
+                        padding: '0.5rem',
+                        borderRadius: '0.5rem',
+                        background: 'var(--glass-bg)',
+                        border: '1px solid var(--border-color)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s',
+                        color: 'var(--text-secondary)'
+                    }}
+                    title={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+                >
+                    {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
                 </div>
                 {children}
             </div>

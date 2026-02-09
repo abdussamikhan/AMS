@@ -279,7 +279,7 @@ export const ObservationModal: React.FC<ObservationModalProps> = ({
                                     {uploadedAttachments.map((att, idx) => (
                                         <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '0.5rem' }}>
                                             <CheckCircle size={14} color="var(--success)" />
-                                            <span style={{ fontSize: '0.75rem', color: '#fff' }}>{att.title}</span>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-primary)' }}>{att.title}</span>
                                             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>File attached</span>
                                         </div>
                                     ))}

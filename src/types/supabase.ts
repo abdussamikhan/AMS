@@ -71,7 +71,7 @@ export type Database = {
             referencedColumns: ["procedure_id"]
           }
         ]
-      },
+      }
       audit_plans: {
         Row: {
           created_at: string | null
@@ -109,7 +109,7 @@ export type Database = {
             referencedColumns: ["id"]
           }
         ]
-      },
+      }
       audit_procedures: {
         Row: {
           created_at: string
@@ -141,7 +141,131 @@ export type Database = {
             referencedColumns: ["mapping_id"]
           }
         ]
-      },
+      }
+      audit_program_procedures: {
+        Row: {
+          created_at: string
+          description: string | null
+          evidence_requirements: string | null
+          evidence_urls: string[] | null
+          id: string
+          procedure_name: string
+          status: string
+          test_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          evidence_requirements?: string | null
+          evidence_urls?: string[] | null
+          id?: string
+          procedure_name: string
+          status?: string
+          test_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          evidence_requirements?: string | null
+          evidence_urls?: string[] | null
+          id?: string
+          procedure_name?: string
+          status?: string
+          test_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_program_procedures_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "audit_program_tests"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      audit_program_tests: {
+        Row: {
+          control_status: string
+          created_at: string
+          id: string
+          issue_observation: boolean
+          program_id: string
+          risk_register_id: string
+          risk_status: string
+          updated_at: string
+        }
+        Insert: {
+          control_status?: string
+          created_at?: string
+          id?: string
+          issue_observation?: boolean
+          program_id: string
+          risk_register_id: string
+          risk_status?: string
+          updated_at?: string
+        }
+        Update: {
+          control_status?: string
+          created_at?: string
+          id?: string
+          issue_observation?: boolean
+          program_id?: string
+          risk_register_id?: string
+          risk_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_program_tests_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "audit_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_program_tests_risk_register_id_fkey"
+            columns: ["risk_register_id"]
+            isOneToOne: false
+            referencedRelation: "risk_register"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      audit_programs: {
+        Row: {
+          audit_id: string
+          created_at: string
+          id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          audit_id: string
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          audit_id?: string
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_programs_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audits"
+            referencedColumns: ["audit_id"]
+          }
+        ]
+      }
       audits: {
         Row: {
           assigned_auditor: string | null
@@ -219,7 +343,7 @@ export type Database = {
             referencedColumns: ["plan_id"]
           }
         ]
-      },
+      }
       departments: {
         Row: {
           created_at: string
@@ -251,7 +375,7 @@ export type Database = {
             referencedColumns: ["function_id"]
           }
         ]
-      },
+      }
       framework_mapping: {
         Row: {
           created_at: string
@@ -286,7 +410,7 @@ export type Database = {
             referencedColumns: ["risk_id"]
           }
         ]
-      },
+      }
       functions: {
         Row: {
           created_at: string
@@ -305,7 +429,7 @@ export type Database = {
           is_active?: boolean
         }
         Relationships: []
-      },
+      }
       industries: {
         Row: {
           created_at: string
@@ -326,7 +450,7 @@ export type Database = {
           is_active?: boolean
         }
         Relationships: []
-      },
+      }
       management_responses: {
         Row: {
           action_plan: string | null
@@ -367,7 +491,7 @@ export type Database = {
             referencedColumns: ["observation_id"]
           }
         ]
-      },
+      }
       notifications: {
         Row: {
           created_at: string
@@ -402,7 +526,7 @@ export type Database = {
             referencedColumns: ["id"]
           }
         ]
-      },
+      }
       profiles: {
         Row: {
           created_at: string
@@ -434,7 +558,7 @@ export type Database = {
             referencedColumns: ["id"]
           }
         ]
-      },
+      }
       risk_categories: {
         Row: {
           category_name: string
@@ -455,7 +579,7 @@ export type Database = {
           risk_id?: string
         }
         Relationships: []
-      },
+      }
       risk_control_matrix: {
         Row: {
           control_description: string
@@ -527,6 +651,89 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "risk_categories"
             referencedColumns: ["risk_id"]
+          }
+        ]
+      }
+      risk_register: {
+        Row: {
+          id: string
+          rcm_id: string | null
+          risk_title: string
+          risk_description: string
+          risk_category_id: string
+          inherent_likelihood: number
+          inherent_impact: number
+          inherent_score: number
+          residual_likelihood: number
+          residual_impact: number
+          residual_score: number
+          risk_owner: string | null
+          audit_frequency: string | null
+          target_residual_score: number | null
+          remarks: string | null
+          control_title: string | null
+          control_description: string | null
+          action_plan: string | null
+          fiscal_year: number
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          rcm_id?: string | null
+          risk_title: string
+          risk_description: string
+          risk_category_id: string
+          inherent_likelihood: number
+          inherent_impact: number
+          inherent_score: number
+          residual_likelihood: number
+          residual_impact: number
+          residual_score: number
+          risk_owner?: string | null
+          audit_frequency?: string | null
+          target_residual_score?: number | null
+          remarks?: string | null
+          control_title?: string | null
+          control_description?: string | null
+          action_plan?: string | null
+          fiscal_year: number
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          rcm_id?: string | null
+          risk_title?: string
+          risk_description?: string
+          risk_category_id?: string
+          inherent_likelihood?: number
+          inherent_impact?: number
+          inherent_score?: number
+          residual_likelihood?: number
+          residual_impact?: number
+          residual_score?: number
+          risk_owner?: string | null
+          audit_frequency?: string | null
+          target_residual_score?: number | null
+          remarks?: string | null
+          control_title?: string | null
+          control_description?: string | null
+          action_plan?: string | null
+          fiscal_year?: number
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_register_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           }
         ]
       }

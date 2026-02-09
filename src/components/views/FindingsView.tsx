@@ -47,7 +47,7 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
                 <div className="section-title" style={{ justifyContent: 'space-between', width: '100%', marginBottom: '1.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <CheckCircle size={24} color="var(--accent-blue)" />
-                        <h2>Active Observations List</h2>
+                        <h2>Observations List</h2>
                     </div>
                     <button
                         className="btn btn-primary"
@@ -124,10 +124,9 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
                                             style={{
                                                 background: 'var(--glass-bg)',
                                                 border: '1px solid var(--border-color)',
-                                                color: '#fff',
-                                                padding: '0.5rem 1rem',
                                                 borderRadius: '0.5rem',
-                                                cursor: 'pointer'
+                                                cursor: 'pointer',
+                                                color: 'var(--text-primary)'
                                             }}>
                                             View Details
                                         </button>
@@ -245,13 +244,11 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
                                                         </div>
                                                     )}
                                                     <span style={{
-                                                        fontSize: '0.7rem',
-                                                        color: '#fff',
-                                                        maxWidth: '100%',
                                                         overflow: 'hidden',
                                                         textOverflow: 'ellipsis',
                                                         whiteSpace: 'nowrap',
-                                                        textAlign: 'center'
+                                                        textAlign: 'center',
+                                                        color: 'var(--text-primary)'
                                                     }}>
                                                         {decodeURIComponent(url.split('/').pop()?.split('?')[0] || 'Unknown File')}
                                                     </span>

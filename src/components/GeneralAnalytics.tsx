@@ -40,9 +40,9 @@ export const GeneralAnalytics: React.FC = () => {
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                                 <XAxis dataKey="month" stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} />
                                 <YAxis stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} />
-                                <Tooltip contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
+                                <Tooltip contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
                                 <Legend />
-                                <Bar dataKey="completed" fill="var(--accent-green)" radius={[4, 4, 0, 0]} name="Completed" />
+                                <Bar dataKey="completed" fill="var(--success)" radius={[4, 4, 0, 0]} name="Completed" />
                                 <Bar dataKey="planned" fill="var(--accent-blue)" radius={[4, 4, 0, 0]} name="Planned" />
                             </BarChart>
                         </ResponsiveContainer>
@@ -85,7 +85,7 @@ export const GeneralAnalytics: React.FC = () => {
                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
                                 </Pie>
-                                <Tooltip contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
+                                <Tooltip contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
@@ -95,7 +95,7 @@ export const GeneralAnalytics: React.FC = () => {
                 <section style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', padding: '1.5rem' }}>
                     <div style={{ marginBottom: '1.5rem' }}>
                         <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <CheckCircle size={18} color="var(--accent-green)" />
+                            <CheckCircle size={18} color="var(--success)" />
                             Control Effectiveness
                         </h3>
                         <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Control performance metrics</p>
@@ -110,10 +110,10 @@ export const GeneralAnalytics: React.FC = () => {
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                                 <XAxis dataKey="type" stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} />
                                 <YAxis stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} />
-                                <Tooltip contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
+                                <Tooltip contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
                                 <Legend />
-                                <Bar dataKey="effective" stackId="a" fill="var(--accent-green)" radius={[4, 4, 0, 0]} name="Effective" />
-                                <Bar dataKey="ineffective" stackId="a" fill="var(--accent-red)" radius={[4, 4, 0, 0]} name="Ineffective" />
+                                <Bar dataKey="effective" stackId="a" fill="var(--success)" radius={[4, 4, 0, 0]} name="Effective" />
+                                <Bar dataKey="ineffective" stackId="a" fill="var(--error)" radius={[4, 4, 0, 0]} name="Ineffective" />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -123,7 +123,7 @@ export const GeneralAnalytics: React.FC = () => {
                 <section style={{ background: 'var(--card-bg)', borderRadius: '1.25rem', border: '1px solid var(--border-color)', padding: '1.5rem', gridColumn: 'span 2' }}>
                     <div style={{ marginBottom: '1.5rem' }}>
                         <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <ShieldAlert size={18} color="var(--accent-red)" />
+                            <ShieldAlert size={18} color="var(--error)" />
                             Observations Trend by Severity
                         </h3>
                         <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Monthly observations breakdown</p>
@@ -141,7 +141,7 @@ export const GeneralAnalytics: React.FC = () => {
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                                 <XAxis dataKey="month" stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} />
                                 <YAxis stroke="var(--text-secondary)" fontSize={11} axisLine={false} tickLine={false} />
-                                <Tooltip contentStyle={{ background: '#1a1f26', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
+                                <Tooltip contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '0.5rem' }} />
                                 <Legend />
                                 <Bar dataKey="critical" stackId="a" fill="#dc2626" name="Critical" />
                                 <Bar dataKey="high" stackId="a" fill="#f59e0b" name="High" />

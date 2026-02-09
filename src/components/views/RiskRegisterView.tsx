@@ -44,7 +44,7 @@ export const RiskRegisterView: React.FC<RiskRegisterViewProps> = ({
                         placeholder="Search risks or controls..."
                         value={riskRegisterFilters.search}
                         onChange={e => setRiskRegisterFilters({ ...riskRegisterFilters, search: e.target.value })}
-                        style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none', marginLeft: '0.8rem', flex: 1 }}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', outline: 'none', marginLeft: '0.8rem', flex: 1 }}
                     />
                 </div>
                 <select
@@ -106,7 +106,7 @@ export const RiskRegisterView: React.FC<RiskRegisterViewProps> = ({
             <div style={{ background: 'var(--card-bg)', borderRadius: '1rem', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                     <thead>
-                        <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)' }}>
+                        <tr style={{ background: 'var(--glass-bg)', borderBottom: '1px solid var(--border-color)' }}>
                             <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '40%' }}>Risk Details</th>
                             <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '40%' }}>Desired Control</th>
                             <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', textAlign: 'center', width: '5%' }}>Inherent Risk Score</th>
@@ -132,9 +132,9 @@ export const RiskRegisterView: React.FC<RiskRegisterViewProps> = ({
                                 const residualScore = entry.residual_likelihood * entry.residual_impact;
 
                                 return (
-                                    <tr key={entry.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                    <tr key={entry.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                         <td style={{ padding: '1.25rem' }}>
-                                            <div style={{ fontWeight: '600', color: '#fff', marginBottom: '0.25rem', fontSize: '0.85rem' }}>{entry.risk_title}</div>
+                                            <div style={{ fontWeight: '600', color: 'var(--text-primary)', marginBottom: '0.25rem', fontSize: '0.85rem' }}>{entry.risk_title}</div>
                                             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{entry.risk_description}</div>
                                             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', alignItems: 'center' }}>
                                                 <span style={{ fontSize: '0.7rem', color: 'var(--accent-blue)', background: 'rgba(59,130,246,0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
@@ -147,7 +147,7 @@ export const RiskRegisterView: React.FC<RiskRegisterViewProps> = ({
                                         </td>
                                         <td style={{ padding: '1.25rem' }}>
                                             {entry.control_title && (
-                                                <div style={{ fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.25rem', color: '#e2e8f0' }}>
+                                                <div style={{ fontWeight: '500', fontSize: '0.85rem', marginBottom: '0.25rem', color: 'var(--text-primary)' }}>
                                                     {entry.control_title}
                                                 </div>
                                             )}

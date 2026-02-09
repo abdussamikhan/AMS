@@ -60,3 +60,15 @@ export type RiskRegisterEntry = {
         category_name: string
     }
 }
+
+export type AuditProgram = Database['public']['Tables']['audit_programs']['Row'] & {
+    audits?: { audit_title: string }
+    tests?: AuditProgramTest[]
+}
+
+export type AuditProgramTest = Database['public']['Tables']['audit_program_tests']['Row'] & {
+    risk_register?: RiskRegisterEntry
+    procedures?: AuditProgramProcedure[]
+}
+
+export type AuditProgramProcedure = Database['public']['Tables']['audit_program_procedures']['Row']

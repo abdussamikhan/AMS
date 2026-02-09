@@ -155,7 +155,7 @@ export const RcmView: React.FC<RcmViewProps> = ({
             <div style={{ background: 'var(--card-bg)', borderRadius: '1rem', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                     <thead>
-                        <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)' }}>
+                        <tr style={{ background: 'var(--glass-bg)', borderBottom: '1px solid var(--border-color)' }}>
                             <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '20%' }}>Function / Department</th>
                             <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '25%' }}>Risk Scenario</th>
                             <th style={{ padding: '1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', width: '25%' }}>Control Activity</th>
@@ -178,7 +178,7 @@ export const RcmView: React.FC<RcmViewProps> = ({
                                 return matchesSearch && matchesIndustry && matchesFunction && matchesDepartment && matchesSystem && matchesCategory && matchesFrequency
                             })
                             .map((entry) => (
-                                <tr key={entry.rcm_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <tr key={entry.rcm_id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--glass-bg)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                     <td style={{ padding: '1rem', verticalAlign: 'top' }}>
                                         <div style={{ fontSize: '0.8rem', fontWeight: '500', color: 'var(--accent-blue)' }}>{entry.functions?.function_name}</div>
                                         <div style={{ fontSize: '0.7rem', color: 'var(--accent-blue)', marginTop: '0.25rem' }}>{entry.departments?.department_name}</div>

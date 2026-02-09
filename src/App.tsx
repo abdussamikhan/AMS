@@ -2,17 +2,16 @@ import { useEffect, useState, useMemo } from 'react'
 import type { Observation } from './types'
 import { useAuth } from './hooks/useAuth'
 import { useAuditData } from './hooks/useAuditData'
+import { useTheme } from './hooks/useTheme'
 
 
 import {
   Search,
   Plus,
   Download,
-  Send,
   X,
   Calendar,
-  FileText,
-  ExternalLink
+  FileText
 } from 'lucide-react'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
@@ -25,6 +24,7 @@ import { FindingsView } from './components/views/FindingsView'
 import { RcmView } from './components/views/RcmView'
 import { RiskRegisterView } from './components/views/RiskRegisterView'
 import { AuditPlanningView } from './components/views/AuditPlanningView'
+import { AuditProgramView } from './components/views/AuditProgramView'
 import { AdminSetupView } from './components/views/AdminSetupView'
 import { AdminReferencesView } from './components/views/AdminReferencesView'
 import { AdminTemplatesView } from './components/views/AdminTemplatesView'
@@ -38,7 +38,9 @@ import { RcmModal } from './components/modals/RcmModal'
 import { ReferenceUploadModal } from './components/modals/ReferenceUploadModal'
 
 
+
 function App() {
+  const { theme, toggleTheme } = useTheme()
   const {
     session,
     profile,
@@ -106,8 +108,6 @@ function App() {
     newAudit,
     setNewAudit,
     auditors,
-    mgmtResp,
-    setMgmtResp,
     isCustomFunctionRcm,
     setIsCustomFunctionRcm,
     isCustomDepartmentRcm,
@@ -170,15 +170,51 @@ function App() {
     setIndustries,
     setAllFunctions,
     handleGenerateRiskRegisterPDF,
-    handleDownloadRiskRegisterCSV
+    handleDownloadRiskRegisterCSV,
+    auditPrograms,
+    selectedProgram,
+    setSelectedProgram,
+    isProgramLoading,
+    fetchProgramDetails,
+    createAuditProgram,
+    updateProcedureStatus,
+    addProcedureToTest,
+    addTestToProgram,
+    toggleIssueObservation
   } = useAuditData(session)
 
   const [activeView, setActiveView] = useState<string>('overview')
-  const [isAdminExpanded, setIsAdminExpanded] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedObs, setSelectedObs] = useState<Observation | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
   const [isAppLoading, setIsAppLoading] = useState(true)
+
+  const handleToggleObservation = async (testId: string, issue: boolean) => {
+    const success = await toggleIssueObservation(testId, issue);
+    if (success && issue) {
+      // Find the test data in selectedProgram
+      const test = selectedProgram?.tests?.find(t => t.id === testId);
+      if (test) {
+        const failedProcs = test.procedures?.filter(p => p.status === 'Failed') || [];
+        const conditionText = failedProcs.length > 0
+          ? "The following test procedures failed:\n" + failedProcs.map(p => `- ${p.procedure_name}: ${p.description}`).join('\n')
+          : "Failed procedures identified during testing.";
+
+        setNewObs({
+          procedure_id: '',
+          condition: conditionText,
+          criteria: test.risk_register?.control_description || '',
+          cause: '',
+          effect: '',
+          recommendation: '',
+          risk_rating: 'Medium',
+          title: `Observation: ${test.risk_register?.risk_title || 'New Finding'}`,
+          audit_id: selectedProgram?.audit_id || ''
+        });
+        setShowNewModal(true);
+      }
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setIsAppLoading(false), 1000)
@@ -193,6 +229,8 @@ function App() {
   }, [auditPlans, selectedPlanId])
 
   const [analyticsView, setAnalyticsView] = useState<'audits' | 'rcm' | 'management'>('audits')
+  const [adminView, setAdminView] = useState<'setup' | 'references' | 'templates'>('setup')
+  const [riskAssessmentView, setRiskAssessmentView] = useState<'library' | 'register'>('library')
 
   const chartData = useMemo(() => {
     const categories = Array.from(new Set(observations.map(o => o.audit_procedures?.framework_mapping?.risk_categories?.category_name || 'Uncategorized')))
@@ -328,8 +366,6 @@ function App() {
       <Sidebar
         activeView={activeView}
         setActiveView={setActiveView}
-        isAdminExpanded={isAdminExpanded}
-        setIsAdminExpanded={setIsAdminExpanded}
         profile={profile}
         session={session}
         handleLogout={handleLogout}
@@ -344,6 +380,8 @@ function App() {
           setNotifications={setNotifications}
           markAsRead={markAsRead}
           session={session}
+          theme={theme}
+          toggleTheme={toggleTheme}
         >
           <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
             {activeView === 'findings' && (
@@ -363,7 +401,7 @@ function App() {
                     placeholder="Search findings..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ background: 'none', border: 'none', color: '#fff', outline: 'none', width: '200px' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-primary)', outline: 'none', width: '200px' }}
                   />
                   {searchQuery && (
                     <button
@@ -465,7 +503,7 @@ function App() {
                   }}
                   style={{
                     background: 'var(--glass-bg)',
-                    color: '#fff',
+                    color: 'var(--text-primary)',
                     border: '1px solid var(--border-color)',
                     padding: '0.5rem 1rem',
                     borderRadius: '0.5rem',
@@ -489,7 +527,7 @@ function App() {
                   }}
                   style={{
                     background: 'var(--glass-bg)',
-                    color: '#fff',
+                    color: 'var(--text-primary)',
                     border: '1px solid var(--border-color)',
                     padding: '0.5rem 1rem',
                     borderRadius: '0.5rem',
@@ -518,7 +556,7 @@ function App() {
                 <button
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowNewAuditModal(true); }}
                   className="auth-button"
-                  style={{ width: 'auto', padding: '0.5rem 1.5rem', background: 'var(--glass-bg)', border: '1px solid var(--accent-blue)', cursor: 'pointer' }}
+                  style={{ width: 'auto', padding: '0.5rem 1.5rem', background: 'var(--glass-bg)', border: '1px solid var(--accent-blue)', color: 'var(--text-primary)', cursor: 'pointer' }}
                 >
                   <Calendar size={18} /> Schedule Engagement
                 </button>
@@ -550,21 +588,6 @@ function App() {
                 Audit Findings
               </button>
               <button
-                onClick={() => setAnalyticsView('rcm')}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: 'none',
-                  border: 'none',
-                  color: analyticsView === 'rcm' ? 'var(--accent-purple)' : 'var(--text-secondary)',
-                  borderBottom: analyticsView === 'rcm' ? '2px solid var(--accent-purple)' : '2px solid transparent',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  transition: 'all 0.2s'
-                }}
-              >
-                RCM Analytics
-              </button>
-              <button
                 onClick={() => setAnalyticsView('management')}
                 style={{
                   padding: '0.75rem 1.5rem',
@@ -578,6 +601,21 @@ function App() {
                 }}
               >
                 Audit Management
+              </button>
+              <button
+                onClick={() => setAnalyticsView('rcm')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'none',
+                  border: 'none',
+                  color: analyticsView === 'rcm' ? 'var(--accent-purple)' : 'var(--text-secondary)',
+                  borderBottom: analyticsView === 'rcm' ? '2px solid var(--accent-purple)' : '2px solid transparent',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+              >
+                RCM Analytics
               </button>
             </div>
 
@@ -598,86 +636,189 @@ function App() {
               />
             )}
           </>
-        ) :
-          activeView === 'analytics' ? (
-            <GeneralAnalytics />
-          ) : activeView === 'admin-setup' ? (
-            <AdminSetupView
-              industries={industries}
-              setIndustries={setIndustries}
-              allFunctions={allFunctions}
-              setAllFunctions={setAllFunctions}
-              allDepartments={allDepartments}
-              toggleDepartmentStatus={toggleDepartmentStatus}
-            />
-          ) : activeView === 'admin-references' ? (
-            <AdminReferencesView
-              refDocs={refDocs}
-              refFilters={refFilters}
-              setRefFilters={setRefFilters}
-              setShowRefUploadModal={setShowRefUploadModal}
-              handleDeleteRef={handleDeleteRef}
-              profile={profile}
-            />
-          ) : activeView === 'admin-templates' ? (
-            <AdminTemplatesView
-              isTemplateUploading={isTemplateUploading}
-              setIsTemplateUploading={setIsTemplateUploading}
-            />
-          ) : activeView === 'audit-planning' ? (
-            <AuditPlanningView
-              auditPlans={auditPlans}
-              selectedPlanId={selectedPlanId}
-              setSelectedPlanId={setSelectedPlanId}
-              audits={audits}
-              setActiveView={setActiveView}
-              setSearchQuery={setSearchQuery}
-            />
-          ) : activeView === 'rcm' ? (
-            <RcmView
-              rcmFilters={rcmFilters}
-              setRcmFilters={setRcmFilters}
-              industries={industries}
-              allFunctions={allFunctions}
-              allDepartments={allDepartments}
-              allSystems={allSystems}
-              riskCats={riskCats}
-              rcmEntries={rcmEntries}
-              openEditRcmModal={openEditRcmModal}
-              handleDeleteRcm={handleDeleteRcm}
-              setIsEditingRcm={setIsEditingRcm}
-              setCurrentRcmId={setCurrentRcmId}
-              setNewRcm={setNewRcm}
-              setShowNewRcmModal={setShowNewRcmModal}
-            />
-          ) : activeView === 'risk-register' ? (
-            <RiskRegisterView
-              riskRegisterFilters={riskRegisterFilters}
-              setRiskRegisterFilters={setRiskRegisterFilters}
-              riskCats={riskCats}
-              riskRegisterEntries={riskRegisterEntries}
-              setIsEditingRisk={setIsEditingRisk}
-              setCurrentRiskId={setCurrentRiskId}
-              setNewRiskEntry={setNewRiskEntry}
-              setShowNewRiskModal={setShowNewRiskModal}
-              handleDeleteRisk={handleDeleteRisk}
-            />
-          ) : (
-            <FindingsView
-              isDataLoading={isDataLoading}
-              filteredObservations={filteredObservations}
-              setSelectedObs={setSelectedObs}
-              selectedObs={selectedObs}
-              openEditObsModal={openEditObsModal}
-              handleDeleteObs={handleDeleteObs}
-              setIsEditingObs={setIsEditingObs}
-              setCurrentObsId={setCurrentObsId}
-              setNewObs={setNewObs}
-              setUploadedAttachments={setUploadedAttachments}
-              setShowNewModal={setShowNewModal}
-              handleGenerateDetailedPDF={(obs) => handleGenerateDetailedPDF(obs, profile, session?.user?.email)}
-            />
-          )}
+        ) : activeView === 'admin' ? (
+          <>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1px' }}>
+              <button
+                onClick={() => setAdminView('references')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'none',
+                  border: 'none',
+                  color: adminView === 'references' ? 'var(--accent-purple)' : 'var(--text-secondary)',
+                  borderBottom: adminView === 'references' ? '2px solid var(--accent-purple)' : '2px solid transparent',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+              >
+                References
+              </button>
+              <button
+                onClick={() => setAdminView('setup')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'none',
+                  border: 'none',
+                  color: adminView === 'setup' ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                  borderBottom: adminView === 'setup' ? '2px solid var(--accent-blue)' : '2px solid transparent',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Setup
+              </button>
+              <button
+                onClick={() => setAdminView('templates')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'none',
+                  border: 'none',
+                  color: adminView === 'templates' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                  borderBottom: adminView === 'templates' ? '2px solid var(--accent-cyan)' : '2px solid transparent',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Templates
+              </button>
+            </div>
+
+            {adminView === 'setup' ? (
+              <AdminSetupView
+                industries={industries}
+                setIndustries={setIndustries}
+                allFunctions={allFunctions}
+                setAllFunctions={setAllFunctions}
+                allDepartments={allDepartments}
+                toggleDepartmentStatus={toggleDepartmentStatus}
+              />
+            ) : adminView === 'references' ? (
+              <AdminReferencesView
+                refDocs={refDocs}
+                refFilters={refFilters}
+                setRefFilters={setRefFilters}
+                setShowRefUploadModal={setShowRefUploadModal}
+                handleDeleteRef={handleDeleteRef}
+                profile={profile}
+              />
+            ) : adminView === 'templates' ? (
+              <AdminTemplatesView
+                isTemplateUploading={isTemplateUploading}
+                setIsTemplateUploading={setIsTemplateUploading}
+              />
+            ) : null}
+          </>
+        ) : activeView === 'risk-assessment' ? (
+          <>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1px' }}>
+              <button
+                onClick={() => setRiskAssessmentView('library')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'none',
+                  border: 'none',
+                  color: riskAssessmentView === 'library' ? 'var(--success)' : 'var(--text-secondary)',
+                  borderBottom: riskAssessmentView === 'library' ? '2px solid var(--success)' : '2px solid transparent',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Risk Library
+              </button>
+              <button
+                onClick={() => setRiskAssessmentView('register')}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'none',
+                  border: 'none',
+                  color: riskAssessmentView === 'register' ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                  borderBottom: riskAssessmentView === 'register' ? '2px solid var(--accent-blue)' : '2px solid transparent',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Risk Register
+              </button>
+            </div>
+
+            {riskAssessmentView === 'register' ? (
+              <RiskRegisterView
+                riskRegisterFilters={riskRegisterFilters}
+                setRiskRegisterFilters={setRiskRegisterFilters}
+                riskCats={riskCats}
+                riskRegisterEntries={riskRegisterEntries}
+                setIsEditingRisk={setIsEditingRisk}
+                setCurrentRiskId={setCurrentRiskId}
+                setNewRiskEntry={setNewRiskEntry}
+                setShowNewRiskModal={setShowNewRiskModal}
+                handleDeleteRisk={handleDeleteRisk}
+              />
+            ) : (
+              <RcmView
+                rcmFilters={rcmFilters}
+                setRcmFilters={setRcmFilters}
+                industries={industries}
+                allFunctions={allFunctions}
+                allDepartments={allDepartments}
+                allSystems={allSystems}
+                riskCats={riskCats}
+                rcmEntries={rcmEntries}
+                openEditRcmModal={openEditRcmModal}
+                handleDeleteRcm={handleDeleteRcm}
+                setIsEditingRcm={setIsEditingRcm}
+                setCurrentRcmId={setCurrentRcmId}
+                setNewRcm={setNewRcm}
+                setShowNewRcmModal={setShowNewRcmModal}
+              />
+            )}
+          </>
+        ) : activeView === 'analytics' ? (
+          <GeneralAnalytics />
+        ) : activeView === 'audit-planning' ? (
+          <AuditPlanningView
+            auditPlans={auditPlans}
+            selectedPlanId={selectedPlanId}
+            setSelectedPlanId={setSelectedPlanId}
+            audits={audits}
+            setActiveView={setActiveView}
+            setSearchQuery={setSearchQuery}
+            createAuditProgram={createAuditProgram}
+            auditPrograms={auditPrograms}
+          />
+        ) : activeView === 'audit-program' ? (
+          <AuditProgramView
+            auditPrograms={auditPrograms}
+            isDataLoading={isDataLoading || isProgramLoading}
+            selectedProgram={selectedProgram}
+            setSelectedProgram={setSelectedProgram}
+            fetchProgramDetails={fetchProgramDetails}
+            updateProcedureStatus={updateProcedureStatus}
+            addProcedureToTest={addProcedureToTest}
+            addTestToProgram={addTestToProgram}
+            handleToggleObservation={handleToggleObservation}
+            riskRegisterEntries={riskRegisterEntries}
+          />
+        ) : (
+          <FindingsView
+            isDataLoading={isDataLoading}
+            filteredObservations={filteredObservations}
+            setSelectedObs={setSelectedObs}
+            selectedObs={selectedObs}
+            openEditObsModal={openEditObsModal}
+            handleDeleteObs={handleDeleteObs}
+            setIsEditingObs={setIsEditingObs}
+            setCurrentObsId={setCurrentObsId}
+            setNewObs={setNewObs}
+            setUploadedAttachments={setUploadedAttachments}
+            setShowNewModal={setShowNewModal}
+            handleGenerateDetailedPDF={(obs) => handleGenerateDetailedPDF(obs, profile, session?.user?.email)}
+          />
+        )}
       </main >
       <ObservationModal
         showNewModal={showNewModal}

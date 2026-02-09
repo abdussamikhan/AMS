@@ -15,7 +15,27 @@
   --critical: #8b1111;
   --glass-bg: rgba(255, 255, 255, 0.03);
   --glass-border: rgba(255, 255, 255, 0.05);
+  --sidebar-bg: rgba(18, 22, 28, 0.95);
+  --modal-bg: #12161c;
+  --dropdown-bg: #1a1f26;
+  --shadow-color: rgba(0, 0, 0, 0.5);
 }
+
+body.light-theme {
+  --bg-color: #f8fafc;
+  --card-bg: #ffffff;
+  --border-color: rgba(0, 0, 0, 0.12);
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --glass-bg: #f1f5f9;
+  --glass-border: rgba(0, 0, 0, 0.1);
+  --sidebar-bg: #ffffff;
+  --modal-bg: #ffffff;
+  --dropdown-bg: #ffffff;
+  --shadow-color: rgba(0, 0, 0, 0.08);
+}
+
+
 
 * {
   margin: 0;
@@ -39,7 +59,7 @@ body {
 
 /* Sidebar */
 .sidebar {
-  background: rgba(18, 22, 28, 0.95);
+  background: var(--sidebar-bg);
   border-right: 1px solid var(--border-color);
   padding: 2rem 1.5rem;
   display: flex;
@@ -107,7 +127,7 @@ body {
 .header h1 {
   font-size: 2.25rem;
   font-weight: 700;
-  background: linear-gradient(to right, #fff, #999);
+  background: linear-gradient(to right, var(--text-primary), var(--text-secondary));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -191,8 +211,8 @@ body {
 }
 
 .observation-card:hover {
-  border-color: rgba(59, 130, 246, 0.5);
-  background: rgba(23, 27, 34, 0.9);
+  border-color: var(--accent-blue);
+  background: var(--glass-bg);
 }
 
 .badge {
@@ -204,28 +224,29 @@ body {
 }
 
 .badge-critical {
-  background: rgba(139, 17, 17, 0.2);
-  color: #ff4d4d;
-  border: 1px solid rgba(139, 17, 17, 0.3);
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .badge-high {
-  background: rgba(239, 68, 68, 0.2);
-  color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .badge-medium {
-  background: rgba(245, 158, 11, 0.2);
-  color: #fcd34d;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
 .badge-low {
-  background: rgba(16, 185, 129, 0.2);
-  color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
+
 
 .obs-info h3 {
   font-size: 1.1rem;
@@ -257,7 +278,7 @@ body {
 }
 
 .modal-content {
-  background: #12161c;
+  background: var(--modal-bg);
   border: 1px solid var(--border-color);
   border-radius: 1.5rem;
   width: 100%;
@@ -265,7 +286,7 @@ body {
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 25px 50px -12px var(--shadow-color);
 }
 
 .modal-header {
@@ -332,9 +353,9 @@ body {
 
 /* Form Controls */
 .form-control {
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: var(--glass-bg) !important;
   border: 1px solid var(--border-color) !important;
-  color: #ffffff !important;
+  color: var(--text-primary) !important;
   padding: 0.75rem 1rem !important;
   border-radius: 0.75rem !important;
   font-family: inherit !important;
@@ -362,8 +383,8 @@ select.form-control {
 
 /* This is the key fix for the dropdown options contrast */
 select.form-control option {
-  background-color: #1a1f26;
-  color: #ffffff;
+  background-color: var(--card-bg);
+  color: var(--text-primary);
 }
 
 textarea.form-control {
@@ -405,19 +426,19 @@ textarea.form-control {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at top left, #1a1f26, #0c0e12);
+  background: var(--bg-color);
   padding: 2rem;
 }
 
 .auth-card {
-  background: rgba(23, 27, 34, 0.8);
+  background: var(--card-bg);
   backdrop-filter: blur(20px);
   border: 1px solid var(--border-color);
   padding: 2.5rem;
   border-radius: 1.5rem;
   width: 100%;
   max-width: 400px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 25px 50px -12px var(--shadow-color);
 }
 
 .auth-header {
@@ -438,7 +459,7 @@ textarea.form-control {
 
 .auth-button {
   background: var(--accent-blue);
-  color: white;
+  color: #ffffff;
   border: none;
   padding: 0.875rem;
   border-radius: 0.75rem;
@@ -446,6 +467,10 @@ textarea.form-control {
   cursor: pointer;
   transition: all 0.2s;
   font-size: 1rem;
+}
+
+body.light-theme .auth-button[style*="background: var(--glass-bg)"] {
+  color: var(--text-primary);
 }
 
 .auth-button:hover {
@@ -491,8 +516,9 @@ textarea.form-control {
 
 .role-btn.active {
   border-color: var(--accent-blue);
-  color: white;
+  color: var(--accent-blue);
   background: rgba(59, 130, 246, 0.1);
+  font-weight: 600;
 }
 
 .logout-container {
@@ -551,6 +577,18 @@ textarea.form-control {
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--border-color);
   border-color: var(--text-secondary);
+}
+/* Tooltip & Charts Fix */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background-color: var(--card-bg) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: var(--border-color) !important;
+  opacity: 0.5;
 }

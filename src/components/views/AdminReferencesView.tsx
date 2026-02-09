@@ -76,7 +76,7 @@ export const AdminReferencesView: React.FC<AdminReferencesViewProps> = ({
                 </div>
 
                 {refDocs.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '4rem', background: 'rgba(255,255,255,0.02)', borderRadius: '1rem', border: '1px dashed var(--border-color)' }}>
+                    <div style={{ textAlign: 'center', padding: '4rem', background: 'var(--glass-bg)', borderRadius: '1rem', border: '1px dashed var(--border-color)' }}>
                         <DatabaseIcon size={40} color="var(--text-secondary)" style={{ opacity: 0.3, marginBottom: '1rem' }} />
                         <p style={{ color: 'var(--text-secondary)' }}>No reference documents uploaded yet.</p>
                     </div>
@@ -89,7 +89,7 @@ export const AdminReferencesView: React.FC<AdminReferencesViewProps> = ({
                                 return matchesSearch && matchesCategory
                             })
                             .map((doc, idx) => (
-                                <div key={doc.id || idx} className="doc-card" style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '1rem', border: '1px solid var(--border-color)', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <div key={doc.id || idx} className="doc-card" style={{ background: 'var(--card-bg)', borderRadius: '1rem', border: '1px solid var(--border-color)', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                         <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '0.5rem', borderRadius: '0.5rem' }}>
                                             <FileText size={20} color="var(--accent-blue)" />
