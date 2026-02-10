@@ -2,6 +2,26 @@ import type { Database } from './supabase'
 
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Notification = Database['public']['Tables']['notifications']['Row']
+export type Industry = Database['public']['Tables']['industries']['Row']
+export type Func = Database['public']['Tables']['functions']['Row']
+export type Dept = Database['public']['Tables']['departments']['Row']
+export type RiskCategory = Database['public']['Tables']['risk_categories']['Row']
+export type AuditPlan = Database['public']['Tables']['audit_plans']['Row']
+
+export interface System {
+    system_id: string
+    system_name: string
+    is_active: boolean
+    created_at: string
+}
+
+export interface ReferenceDocument {
+    doc_id: string
+    title: string
+    category: string
+    file_url: string
+    created_at: string
+}
 
 export type Observation = Database['public']['Tables']['audit_observations']['Row'] & {
     audit_procedures: {
@@ -72,3 +92,21 @@ export type AuditProgramTest = Database['public']['Tables']['audit_program_tests
 }
 
 export type AuditProgramProcedure = Database['public']['Tables']['audit_program_procedures']['Row']
+
+export type AuditEngagement = Database['public']['Tables']['audits']['Row'] & {
+    industries?: { industry_name: string } | null
+    functions?: { function_name: string } | null
+    departments?: { department_name: string } | null
+    risk_categories?: { category_name: string } | null
+    profiles?: { full_name: string | null } | null
+}
+
+export type AuditProcedure = Database['public']['Tables']['audit_procedures']['Row'] & {
+    framework_mapping: {
+        framework_name: string
+        reference_code: string
+        risk_categories?: {
+            category_name: string
+        } | null
+    }
+}

@@ -1,26 +1,28 @@
 import React from 'react';
 import { X, Wand2, Sparkles, Upload, CheckCircle } from 'lucide-react';
 import { supabase } from '../../supabase';
+import type { Observation, AuditEngagement, AuditProcedure } from '../../types';
+import type { Database } from '../../types/supabase';
 
 interface ObservationModalProps {
     showNewModal: boolean;
     setShowNewModal: (show: boolean) => void;
     isEditingObs: boolean;
     currentObsId: string | null;
-    newObs: any;
-    setNewObs: (obs: any) => void;
+    newObs: Partial<Observation>;
+    setNewObs: (obs: Partial<Observation>) => void;
     aiInput: string;
     setAiInput: (input: string) => void;
     isAIProcessing: boolean;
     processWithAI: () => void;
-    audits: any[];
-    procedures: any[];
+    audits: AuditEngagement[];
+    procedures: AuditProcedure[];
     attachmentTitle: string;
     setAttachmentTitle: (title: string) => void;
     handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
     isUploading: boolean;
-    uploadedAttachments: any[];
-    setUploadedAttachments: (attachments: any[]) => void;
+    uploadedAttachments: { url: string; title: string }[];
+    setUploadedAttachments: (attachments: { url: string; title: string }[]) => void;
     fetchData: () => void;
 }
 
@@ -113,10 +115,10 @@ export const ObservationModal: React.FC<ObservationModalProps> = ({
 
                         let error;
                         if (isEditingObs && currentObsId) {
-                            const { error: updateError } = await supabase.from('audit_observations').update(submission).eq('observation_id', currentObsId)
+                            const { error: updateError } = await supabase.from('audit_observations').update(submission as Database['public']['Tables']['audit_observations']['Update']).eq('observation_id', currentObsId)
                             error = updateError;
                         } else {
-                            const { error: insertError } = await supabase.from('audit_observations').insert([submission])
+                            const { error: insertError } = await supabase.from('audit_observations').insert([submission as Database['public']['Tables']['audit_observations']['Insert']])
                             error = insertError;
                         }
 
@@ -130,7 +132,7 @@ export const ObservationModal: React.FC<ObservationModalProps> = ({
                                 cause: '',
                                 effect: '',
                                 recommendation: '',
-                                risk_rating: 'Low' as any,
+                                risk_rating: 'Low' as Database['public']['Enums']['risk_level'],
                                 title: '',
                                 audit_id: ''
                             })
@@ -176,7 +178,7 @@ export const ObservationModal: React.FC<ObservationModalProps> = ({
                                 required
                                 className="form-control"
                                 placeholder="Summarized observation title..."
-                                value={newObs.title}
+                                value={newObs.title || ''}
                                 onChange={e => setNewObs({ ...newObs, title: e.target.value })}
                             />
                         </div>
@@ -187,7 +189,7 @@ export const ObservationModal: React.FC<ObservationModalProps> = ({
                                 required
                                 className="form-control"
                                 placeholder="What was found?"
-                                value={newObs.condition}
+                                value={newObs.condition || ''}
                                 onChange={e => setNewObs({ ...newObs, condition: e.target.value })}
                             />
                         </div>
@@ -199,7 +201,7 @@ export const ObservationModal: React.FC<ObservationModalProps> = ({
                                 className="form-control"
                                 style={{ minHeight: '80px' }}
                                 placeholder="What is the required standard?"
-                                value={newObs.criteria}
+                                value={newObs.criteria || ''}
                                 onChange={e => setNewObs({ ...newObs, criteria: e.target.value })}
                             />
                         </div>
@@ -211,7 +213,7 @@ export const ObservationModal: React.FC<ObservationModalProps> = ({
                                 className="form-control"
                                 style={{ minHeight: '80px' }}
                                 placeholder="Root cause..."
-                                value={newObs.cause}
+                                value={newObs.cause || ''}
                                 onChange={e => setNewObs({ ...newObs, cause: e.target.value })}
                             />
                         </div>
@@ -220,8 +222,8 @@ export const ObservationModal: React.FC<ObservationModalProps> = ({
                             <label className="detail-label">Risk Rating</label>
                             <select
                                 className="form-control"
-                                value={newObs.risk_rating}
-                                onChange={e => setNewObs({ ...newObs, risk_rating: e.target.value as any })}
+                                value={newObs.risk_rating || 'Low'}
+                                onChange={e => setNewObs({ ...newObs, risk_rating: e.target.value as Database['public']['Enums']['risk_level'] })}
                             >
                                 <option value="Low">Low</option>
                                 <option value="Medium">Medium</option>
@@ -235,7 +237,7 @@ export const ObservationModal: React.FC<ObservationModalProps> = ({
                             <textarea
                                 className="form-control"
                                 placeholder="Suggested action plan..."
-                                value={newObs.recommendation}
+                                value={newObs.recommendation || ''}
                                 onChange={e => setNewObs({ ...newObs, recommendation: e.target.value })}
                             />
                         </div>

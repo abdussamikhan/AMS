@@ -1,14 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../supabase'
 import type { Database } from '../types/supabase'
-import type { Observation, Notification, RCMEntry, RiskRegisterEntry, Profile, AuditProgram } from '../types'
+import type {
+    Observation, Notification, RCMEntry, RiskRegisterEntry, Profile, AuditProgram,
+    Industry, Func, Dept, RiskCategory, System, AuditPlan, AuditEngagement, AuditProcedure, ReferenceDocument
+} from '../types'
 import { invokeAiProcessRcm, invokeAiProcessAuditFinding } from '../services/aiService'
 import { downloadCSV, generatePDF, generateDetailedPDF, generateRiskRegisterPDF, downloadRiskRegisterCSV } from '../services/exportService'
+import type { Session } from '@supabase/supabase-js'
 
-export const useAuditData = (session: any) => {
+export const useAuditData = (session: Session | null) => {
     const [isDataLoading, setIsDataLoading] = useState(false)
     const [observations, setObservations] = useState<Observation[]>([])
-    const [procedures, setProcedures] = useState<any[]>([])
+    const [procedures, setProcedures] = useState<AuditProcedure[]>([])
     const [stats, setStats] = useState({
         total: 0,
         critical: 0,
@@ -21,14 +25,14 @@ export const useAuditData = (session: any) => {
 
     // RCM State
     const [rcmEntries, setRcmEntries] = useState<RCMEntry[]>([])
-    const [industries, setIndustries] = useState<any[]>([])
-    const [allFunctions, setAllFunctions] = useState<any[]>([])
-    const [allDepartments, setAllDepartments] = useState<any[]>([])
-    const [riskCats, setRiskCats] = useState<any[]>([])
-    const [allSystems, setAllSystems] = useState<any[]>([])
+    const [industries, setIndustries] = useState<Industry[]>([])
+    const [allFunctions, setAllFunctions] = useState<Func[]>([])
+    const [allDepartments, setAllDepartments] = useState<Dept[]>([])
+    const [riskCats, setRiskCats] = useState<RiskCategory[]>([])
+    const [allSystems, setAllSystems] = useState<System[]>([])
     const [rcmFilters, setRcmFilters] = useState({ industry: 'all', function: 'all', department: 'all', system: 'all', category: 'all', frequency: 'all', search: '' })
     const [showNewRcmModal, setShowNewRcmModal] = useState(false)
-    const [refDocs, setRefDocs] = useState<any[]>([])
+    const [refDocs, setRefDocs] = useState<ReferenceDocument[]>([])
     const [refFilters, setRefFilters] = useState({ category: 'all', search: '' })
     const [riskRegisterEntries, setRiskRegisterEntries] = useState<RiskRegisterEntry[]>([])
     const [riskRegisterFilters, setRiskRegisterFilters] = useState({ category: 'all', owner: 'all', year: new Date().getFullYear().toString(), search: '' })
@@ -62,8 +66,8 @@ export const useAuditData = (session: any) => {
         control_title: '',
         control_description: '',
         reference_standard: '',
-        control_type: 'Preventive' as any,
-        control_frequency: 'Continuous' as any,
+        control_type: 'Preventive' as Database['public']['Enums']['control_type'],
+        control_frequency: 'Continuous' as Database['public']['Enums']['control_frequency'],
         system_id: ''
     })
 
@@ -73,8 +77,8 @@ export const useAuditData = (session: any) => {
     const [isProgramLoading, setIsProgramLoading] = useState(false)
 
     // Audit Planning & Scheduling State
-    const [auditPlans, setAuditPlans] = useState<any[]>([])
-    const [audits, setAudits] = useState<any[]>([])
+    const [auditPlans, setAuditPlans] = useState<AuditPlan[]>([])
+    const [audits, setAudits] = useState<AuditEngagement[]>([])
     const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
     const [isTemplateUploading, setIsTemplateUploading] = useState(false)
     const [showNewPlanModal, setShowNewPlanModal] = useState(false)
@@ -91,7 +95,7 @@ export const useAuditData = (session: any) => {
         department_id: '',
         status: 'Scheduled'
     })
-    const [auditors, setAuditors] = useState<any[]>([])
+    const [auditors, setAuditors] = useState<Profile[]>([])
 
     // Management response form state
     const [mgmtResp, setMgmtResp] = useState({
@@ -126,7 +130,7 @@ export const useAuditData = (session: any) => {
     const [currentObsId, setCurrentObsId] = useState<string | null>(null)
 
     // Findings form state
-    const [newObs, setNewObs] = useState({
+    const [newObs, setNewObs] = useState<Partial<Observation>>({
         procedure_id: '',
         condition: '',
         criteria: '',
@@ -143,24 +147,24 @@ export const useAuditData = (session: any) => {
     const [isRcmAiProcessing, setIsRcmAiProcessing] = useState(false)
 
     // Fetch functions
-    const fetchRefDocs = async () => {
+    const fetchRefDocs = useCallback(async () => {
         try {
             const { data, error } = await (supabase as any)
                 .from('reference_documents')
                 .select('*')
                 .order('created_at', { ascending: false })
             if (error) throw error
-            setRefDocs(data || [])
+            setRefDocs(data as ReferenceDocument[] || [])
         } catch (err) {
             console.error('Error fetching reference docs:', err)
         }
-    }
+    }, [])
 
-    const fetchAuditPlanningData = async () => {
+    const fetchAuditPlanningData = useCallback(async () => {
         try {
             const { data: plans, error: planError } = await supabase.from('audit_plans').select('*').order('year', { ascending: false })
             if (planError) throw planError
-            if (plans) setAuditPlans(plans)
+            if (plans) setAuditPlans(plans as AuditPlan[])
 
             const { data: engs, error: engError } = await supabase
                 .from('audits')
@@ -174,18 +178,18 @@ export const useAuditData = (session: any) => {
                 .order('start_date', { ascending: false })
 
             if (engError) throw engError
-            if (engs) setAudits(engs)
+            if (engs) setAudits(engs as unknown as AuditEngagement[])
         } catch (err) {
             console.error('Error fetching planning data:', err)
         }
-    }
+    }, [])
 
-    const fetchAuditors = async () => {
+    const fetchAuditors = useCallback(async () => {
         const { data } = await supabase.from('profiles').select('*').eq('role', 'auditor')
         if (data) setAuditors(data)
-    }
+    }, [])
 
-    const fetchRcmData = async () => {
+    const fetchRcmData = useCallback(async () => {
         const { data } = await (supabase as any)
             .from('risk_control_matrix')
             .select(`
@@ -198,14 +202,14 @@ export const useAuditData = (session: any) => {
       `)
             .order('created_at', { ascending: false })
         if (data) setRcmEntries(data as RCMEntry[])
-    }
+    }, [])
 
-    const fetchSystems = async () => {
+    const fetchSystems = useCallback(async () => {
         const { data } = await (supabase as any).from('systems').select('*').eq('is_active', true).order('system_name')
         if (data) setAllSystems(data)
-    }
+    }, [])
 
-    const fetchRcmContext = async () => {
+    const fetchRcmContext = useCallback(async () => {
         try {
             const [ind, func, dept, cat] = await Promise.all([
                 supabase.from('industries').select('*').order('industry_name'),
@@ -219,7 +223,7 @@ export const useAuditData = (session: any) => {
             let finalDepartments = dept.data || []
             let finalCategories = cat.data || []
 
-            // Ensure \"Generic\" entries exist
+            // Ensure "Generic" entries exist
             let genInd = finalIndustries.find(i => i.industry_name === 'Generic')
             if (!genInd) {
                 const { data } = await supabase.from('industries').insert({ industry_name: 'Generic' }).select().single()
@@ -257,17 +261,17 @@ export const useAuditData = (session: any) => {
         } catch (err) {
             console.error('Error fetching RCM context:', err)
         }
-    }
+    }, [fetchSystems])
 
-    const fetchNotifications = async () => {
+    const fetchNotifications = useCallback(async () => {
         if (!session) return
         const { data } = await supabase
             .from('notifications')
             .select('*')
             .eq('user_id', session.user.id)
             .order('created_at', { ascending: false })
-        if (data) setNotifications(data)
-    }
+        if (data) setNotifications(data as Notification[])
+    }, [session])
 
     const markAsRead = async (id: string) => {
         const { error } = await supabase
@@ -279,7 +283,7 @@ export const useAuditData = (session: any) => {
         }
     }
 
-    const fetchProcedures = async () => {
+    const fetchProcedures = useCallback(async () => {
         const { data } = await supabase
             .from('audit_procedures')
             .select(`
@@ -290,12 +294,12 @@ export const useAuditData = (session: any) => {
           reference_code
         )
       `)
-        if (data) setProcedures(data)
-    }
+        if (data) setProcedures(data as unknown as AuditProcedure[])
+    }, [])
 
-    const fetchRiskRegister = async () => {
+    const fetchRiskRegister = useCallback(async () => {
         const { data } = await supabase
-            .from('risk_register' as any)
+            .from('risk_register')
             .select(`
         *,
         risk_control_matrix (
@@ -307,10 +311,10 @@ export const useAuditData = (session: any) => {
         )
       `)
             .order('created_at', { ascending: false })
-        if (data) setRiskRegisterEntries(data as any[])
-    }
+        if (data) setRiskRegisterEntries(data as unknown as RiskRegisterEntry[])
+    }, [])
 
-    const fetchAuditPrograms = async () => {
+    const fetchAuditPrograms = useCallback(async () => {
         try {
             const { data, error } = await supabase
                 .from('audit_programs')
@@ -320,11 +324,11 @@ export const useAuditData = (session: any) => {
                 `)
                 .order('created_at', { ascending: false })
             if (error) throw error
-            setAuditPrograms(data as any[])
+            setAuditPrograms(data as unknown as AuditProgram[])
         } catch (err) {
             console.error('Error fetching audit programs:', err)
         }
-    }
+    }, [])
 
     const fetchProgramDetails = async (programId: string) => {
         setIsProgramLoading(true)
@@ -343,7 +347,7 @@ export const useAuditData = (session: any) => {
                 .eq('id', programId)
                 .single()
             if (error) throw error
-            setSelectedProgram(data as any)
+            setSelectedProgram(data as unknown as AuditProgram)
         } catch (err) {
             console.error('Error fetching program details:', err)
         } finally {
@@ -361,8 +365,8 @@ export const useAuditData = (session: any) => {
             if (error) throw error
             fetchAuditPrograms()
             return data
-        } catch (err: any) {
-            alert('Error creating audit program: ' + err.message)
+        } catch (err: unknown) {
+            alert('Error creating audit program: ' + (err as Error).message)
         }
     }
 
@@ -388,8 +392,8 @@ export const useAuditData = (session: any) => {
             } else {
                 fetchProgramDetails(programId);
             }
-        } catch (err: any) {
-            alert('Error adding test: ' + err.message)
+        } catch (err: unknown) {
+            alert('Error adding test: ' + (err as Error).message)
         }
     }
 
@@ -402,8 +406,8 @@ export const useAuditData = (session: any) => {
 
             // Trigger Rule 8 rollup
             await updateProcedureStatus('', 'Pending', testId); // Pass empty ID to just trigger rollup
-        } catch (err: any) {
-            alert('Error adding procedure: ' + err.message)
+        } catch (err: unknown) {
+            alert('Error adding procedure: ' + (err as Error).message)
         }
     }
 
@@ -463,7 +467,7 @@ export const useAuditData = (session: any) => {
                 .single()
             if (ctError) throw ctError
 
-            const riskTitle = (currentTest.risk_register as any)?.risk_title
+            const riskTitle = (currentTest.risk_register as unknown as { risk_title: string })?.risk_title
             const programId = currentTest.program_id
 
             if (riskTitle && programId) {
@@ -477,7 +481,7 @@ export const useAuditData = (session: any) => {
                     .eq('program_id', programId)
                 if (aptError) throw aptError
 
-                const riskSiblings = allProgramTests.filter((t: any) => t.risk_register?.risk_title === riskTitle)
+                const riskSiblings = allProgramTests.filter((t: any) => (t as any).risk_register?.risk_title === riskTitle)
 
                 // Rule 9 Calculation
                 let riskStatus: 'Mitigated' | 'Partially Mitigated' | 'Not Mitigated' = 'Not Mitigated'
@@ -504,12 +508,12 @@ export const useAuditData = (session: any) => {
             }
 
             if (selectedProgram) fetchProgramDetails(selectedProgram.id)
-        } catch (err: any) {
-            alert('Error updating status: ' + err.message)
+        } catch (err: unknown) {
+            alert('Error updating status: ' + (err as Error).message)
         }
     }
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
             setIsDataLoading(true)
             const { data, error } = await supabase
@@ -531,12 +535,12 @@ export const useAuditData = (session: any) => {
                 .order('created_at', { ascending: false })
             if (error) throw error
             if (data) {
-                setObservations(data as Observation[])
+                setObservations(data as unknown as Observation[])
                 const summary = {
                     total: data.length,
-                    critical: data.filter(o => o.risk_rating === 'Critical').length,
-                    high: data.filter(o => o.risk_rating === 'High').length,
-                    medium: data.filter(o => o.risk_rating === 'Medium').length,
+                    critical: data.filter(o => (o as any).risk_rating === 'Critical').length,
+                    high: data.filter(o => (o as any).risk_rating === 'High').length,
+                    medium: data.filter(o => (o as any).risk_rating === 'Medium').length,
                     totalRisks: stats.totalRisks
                 }
                 setStats(summary)
@@ -546,7 +550,7 @@ export const useAuditData = (session: any) => {
         } finally {
             setIsDataLoading(false)
         }
-    }
+    }, [stats.totalRisks])
 
     // AI Handlers
     const handleRcmAiGenerate = async () => {
@@ -563,8 +567,8 @@ export const useAuditData = (session: any) => {
                 reference_standard: data.reference_standard
             }))
             setRcmAiInput('')
-        } catch (err: any) {
-            alert('Failed to generate RCM entry: ' + err.message)
+        } catch (err: unknown) {
+            alert('Failed to generate RCM entry: ' + (err as Error).message)
         } finally {
             setIsRcmAiProcessing(false)
         }
@@ -584,7 +588,7 @@ export const useAuditData = (session: any) => {
                     cause: data.cause || prev.cause,
                     effect: data.effect || prev.effect,
                     recommendation: data.recommendation || prev.recommendation,
-                    risk_rating: (['Low', 'Medium', 'High', 'Critical'].includes(data.risk_rating) ? data.risk_rating : 'Low') as any
+                    risk_rating: (['Low', 'Medium', 'High', 'Critical'].includes(data.risk_rating) ? data.risk_rating : 'Low') as Database['public']['Enums']['risk_level']
                 }))
                 setAiInput('')
                 alert('AI has successfully structured your finding!')
@@ -598,19 +602,19 @@ export const useAuditData = (session: any) => {
     }
 
     // Mutation Handlers
-    const openEditRcmModal = (entry: any) => {
+    const openEditRcmModal = (entry: RCMEntry) => {
         setNewRcm({
-            industry_id: entry.industry_id,
-            function_id: entry.function_id,
-            department_id: entry.department_id,
-            risk_category_id: entry.risk_category_id,
+            industry_id: entry.industry_id || '',
+            function_id: entry.function_id || '',
+            department_id: entry.department_id || '',
+            risk_category_id: entry.risk_category_id || '',
             risk_title: entry.risk_title || '',
-            risk_description: entry.risk_description,
+            risk_description: entry.risk_description || '',
             control_title: entry.control_title || '',
-            control_description: entry.control_description,
-            reference_standard: entry.reference_standard,
-            control_type: entry.control_type,
-            control_frequency: entry.control_frequency,
+            control_description: entry.control_description || '',
+            reference_standard: entry.reference_standard || '',
+            control_type: entry.control_type || 'Preventive',
+            control_frequency: entry.control_frequency || 'Continuous',
             system_id: entry.system_id || ''
         })
         setIsEditingRcm(true)
@@ -692,14 +696,14 @@ export const useAuditData = (session: any) => {
                 control_title: '',
                 control_description: '',
                 reference_standard: '',
-                control_type: 'Preventive' as any,
-                control_frequency: 'Continuous' as any,
+                control_type: 'Preventive' as Database['public']['Enums']['control_type'],
+                control_frequency: 'Continuous' as Database['public']['Enums']['control_frequency'],
                 system_id: ''
             })
             fetchRcmData()
             fetchRcmContext()
-        } catch (err: any) {
-            alert(err.message)
+        } catch (err: unknown) {
+            alert((err as Error).message)
         }
     }
 
@@ -717,8 +721,8 @@ export const useAuditData = (session: any) => {
             setIsEditingRisk(false)
             setCurrentRiskId(null)
             fetchRiskRegister()
-        } catch (err: any) {
-            alert(err.message)
+        } catch (err: unknown) {
+            alert((err as Error).message)
         }
     }
 
@@ -780,7 +784,7 @@ export const useAuditData = (session: any) => {
         }
     }
 
-    const handleDeleteRef = async (doc: any) => {
+    const handleDeleteRef = async (doc: ReferenceDocument) => {
         if (window.confirm('Are you sure you want to delete this document?')) {
             try {
                 const fileName = doc.file_url.split('/').pop()
@@ -824,7 +828,7 @@ export const useAuditData = (session: any) => {
         downloadRiskRegisterCSV(entries)
     }
 
-    const handleGeneratePDF = (filteredObservations: Observation[], stats: any, profile: Profile | null, email?: string) => {
+    const handleGeneratePDF = (filteredObservations: Observation[], stats: { total: number; critical: number; high: number; medium: number }, profile: Profile | null, email?: string) => {
         generatePDF(filteredObservations, profile, stats, email)
     }
 
@@ -836,7 +840,7 @@ export const useAuditData = (session: any) => {
         generateRiskRegisterPDF(entries, profile, fiscalYear, email)
     }
 
-    const toggleDepartmentStatus = async (dept: any) => {
+    const toggleDepartmentStatus = async (dept: Dept) => {
         const newStatus = dept.is_active === false ? true : false
         const { error } = await supabase
             .from('departments')
@@ -882,7 +886,11 @@ export const useAuditData = (session: any) => {
                 supabase.removeChannel(channel)
             }
         }
-    }, [session])
+    }, [
+        session, fetchData, fetchProcedures, fetchNotifications, fetchRcmData,
+        fetchRcmContext, fetchAuditPlanningData, fetchAuditors, fetchRefDocs,
+        fetchRiskRegister, fetchAuditPrograms
+    ])
 
     const toggleIssueObservation = async (testId: string, issue: boolean) => {
         try {
@@ -894,8 +902,8 @@ export const useAuditData = (session: any) => {
 
             if (selectedProgram) fetchProgramDetails(selectedProgram.id)
             return true
-        } catch (err: any) {
-            alert('Error updating observation toggle: ' + err.message)
+        } catch (err: unknown) {
+            alert('Error updating observation toggle: ' + (err as Error).message)
             return false
         }
     }
