@@ -294,7 +294,7 @@ export const useAuditData = (session: any) => {
     }
 
     const fetchRiskRegister = async () => {
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('risk_register' as any)
             .select(`
         *,

@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 export const getRatingBadge = (rating: string) => {
     const r = rating.toLowerCase();
