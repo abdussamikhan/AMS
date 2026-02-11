@@ -11,8 +11,16 @@ import {
 } from 'recharts'
 import { BarChart3 } from 'lucide-react'
 
+interface RiskHeatmapPoint {
+    name: string;
+    Critical: number;
+    High: number;
+    Medium: number;
+    Low: number;
+}
+
 interface RiskHeatmapProps {
-    chartData: any[]
+    chartData: RiskHeatmapPoint[]
 }
 
 export const RiskHeatmap: React.FC<RiskHeatmapProps> = ({ chartData }) => {

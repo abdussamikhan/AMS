@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import type { Profile } from '../types'
+import type { Session } from '@supabase/supabase-js'
 
 export const useAuth = () => {
-    const [session, setSession] = useState<any>(null)
+    const [session, setSession] = useState<Session | null>(null)
     const [profile, setProfile] = useState<Profile | null>(null)
     const [isAuthLoading, setIsAuthLoading] = useState(false)
     const [isAppLoading, setIsAppLoading] = useState(true)
@@ -62,8 +63,8 @@ export const useAuth = () => {
                 if (error) throw error
                 alert('Confirmation email sent! Please check your inbox (and spam).')
             }
-        } catch (err: any) {
-            alert(err.message)
+        } catch (err: unknown) {
+            alert((err as Error).message)
         } finally {
             setIsAuthLoading(false)
         }

@@ -2,9 +2,9 @@ import type { Database } from './supabase'
 
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Notification = Database['public']['Tables']['notifications']['Row']
-export type Industry = Database['public']['Tables']['industries']['Row']
-export type Func = Database['public']['Tables']['functions']['Row']
-export type Dept = Database['public']['Tables']['departments']['Row']
+export type Industry = Database['public']['Tables']['industries']['Row'] & { is_active?: boolean | null }
+export type Func = Database['public']['Tables']['functions']['Row'] & { is_active?: boolean | null }
+export type Dept = Database['public']['Tables']['departments']['Row'] & { is_active?: boolean | null }
 export type RiskCategory = Database['public']['Tables']['risk_categories']['Row']
 export type AuditPlan = Database['public']['Tables']['audit_plans']['Row']
 
@@ -20,6 +20,7 @@ export interface ReferenceDocument {
     title: string
     category: string
     file_url: string
+    file_size?: string
     created_at: string
 }
 
@@ -109,4 +110,51 @@ export type AuditProcedure = Database['public']['Tables']['audit_procedures']['R
             category_name: string
         } | null
     }
+}
+
+export interface NewRiskRegisterEntry {
+    risk_title: string;
+    risk_description: string;
+    risk_category_id: string;
+    inherent_likelihood: number;
+    inherent_impact: number;
+    residual_likelihood: number;
+    residual_impact: number;
+    risk_owner: string;
+    audit_frequency: string;
+    action_plan: string;
+    status: string;
+    fiscal_year: number;
+    rcm_id: string | null;
+    control_title?: string;
+    control_description?: string;
+    target_residual_score?: number;
+    remarks?: string;
+}
+
+export interface NewRcmEntry {
+    industry_id: string;
+    function_id: string;
+    department_id: string;
+    risk_category_id: string;
+    risk_title: string;
+    risk_description: string;
+    control_title: string;
+    control_description: string;
+    reference_standard: string;
+    control_type: Database['public']['Enums']['control_type'];
+    control_frequency: Database['public']['Enums']['control_frequency'];
+    system_id: string | null;
+}
+
+export interface NewObservation {
+    procedure_id: string;
+    condition: string;
+    criteria: string;
+    cause: string;
+    effect: string;
+    recommendation: string;
+    risk_rating: Database['public']['Enums']['risk_level'];
+    title: string;
+    audit_id: string;
 }

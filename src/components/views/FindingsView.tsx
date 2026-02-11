@@ -10,6 +10,7 @@ import {
     ExternalLink
 } from 'lucide-react';
 import type { Observation } from '../../types';
+import type { NewObservation } from '../../hooks/useAuditData';
 import { getRatingBadge } from '../../utils/uiHelpers';
 
 interface FindingsViewProps {
@@ -21,8 +22,8 @@ interface FindingsViewProps {
     handleDeleteObs: (id: string) => Promise<void>;
     setIsEditingObs: (val: boolean) => void;
     setCurrentObsId: (id: string | null) => void;
-    setNewObs: (val: any) => void;
-    setUploadedAttachments: (val: any) => void;
+    setNewObs: React.Dispatch<React.SetStateAction<NewObservation>>;
+    setUploadedAttachments: React.Dispatch<React.SetStateAction<{ url: string; title: string; }[]>>;
     setShowNewModal: (val: boolean) => void;
     handleGenerateDetailedPDF: (obs: Observation) => void;
 }
@@ -61,7 +62,7 @@ export const FindingsView: React.FC<FindingsViewProps> = ({
                                 cause: '',
                                 effect: '',
                                 recommendation: '',
-                                risk_rating: 'Low' as any,
+                                risk_rating: 'Low',
                                 title: '',
                                 audit_id: ''
                             });

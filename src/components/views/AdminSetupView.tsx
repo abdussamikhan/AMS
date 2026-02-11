@@ -1,14 +1,15 @@
 import React from 'react';
 import { Target, Layers, Users } from 'lucide-react';
 import { supabase } from '../../supabase';
+import type { Industry, Func, Dept } from '../../types';
 
 interface AdminSetupViewProps {
-    industries: any[];
-    setIndustries: React.Dispatch<React.SetStateAction<any[]>>;
-    allFunctions: any[];
-    setAllFunctions: React.Dispatch<React.SetStateAction<any[]>>;
-    allDepartments: any[];
-    toggleDepartmentStatus: (dept: any) => void;
+    industries: Industry[];
+    setIndustries: React.Dispatch<React.SetStateAction<Industry[]>>;
+    allFunctions: Func[];
+    setAllFunctions: React.Dispatch<React.SetStateAction<Func[]>>;
+    allDepartments: Dept[];
+    toggleDepartmentStatus: (dept: Dept) => void;
 }
 
 export const AdminSetupView: React.FC<AdminSetupViewProps> = ({

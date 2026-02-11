@@ -467,6 +467,7 @@ function App() {
                       risk_owner: '',
                       audit_frequency: '12 months',
                       action_plan: '',
+                      status: 'Open',
                       fiscal_year: new Date().getFullYear(),
                       rcm_id: null
                     });
@@ -520,9 +521,9 @@ function App() {
                 <button
                   onClick={() => {
                     if (activeView === 'findings') {
-                      handleGeneratePDF(observations, stats, profile, session?.user?.email)
+                      handleGeneratePDF(observations, stats, profile, session?.user?.email || '')
                     } else {
-                      handleGenerateRiskRegisterPDF(filteredRiskRegisterEntries, profile, riskRegisterFilters.year, session?.user?.email)
+                      handleGenerateRiskRegisterPDF(filteredRiskRegisterEntries, profile, riskRegisterFilters.year, session?.user?.email || '')
                     }
                   }}
                   style={{

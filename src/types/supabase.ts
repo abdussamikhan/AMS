@@ -651,6 +651,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "risk_categories"
             referencedColumns: ["risk_id"]
+          },
+          {
+            foreignKeyName: "risk_control_matrix_system_id_fkey"
+            columns: ["system_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["system_id"]
           }
         ]
       }
@@ -687,10 +694,10 @@ export type Database = {
           risk_category_id: string
           inherent_likelihood: number
           inherent_impact: number
-          inherent_score: number
+          inherent_score?: number
           residual_likelihood: number
           residual_impact: number
-          residual_score: number
+          residual_score?: number
           risk_owner?: string | null
           audit_frequency?: string | null
           target_residual_score?: number | null
@@ -736,6 +743,54 @@ export type Database = {
             referencedColumns: ["id"]
           }
         ]
+      }
+      reference_documents: {
+        Row: {
+          category: string
+          created_at: string
+          doc_id: string
+          file_size: string | null
+          file_url: string
+          title: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          doc_id?: string
+          file_size?: string | null
+          file_url: string
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          doc_id?: string
+          file_size?: string | null
+          file_url?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      systems: {
+        Row: {
+          created_at: string
+          is_active: boolean
+          system_id: string
+          system_name: string
+        }
+        Insert: {
+          created_at?: string
+          is_active?: boolean
+          system_id?: string
+          system_name: string
+        }
+        Update: {
+          created_at?: string
+          is_active?: boolean
+          system_id?: string
+          system_name?: string
+        }
+        Relationships: []
       }
     }
     Views: {

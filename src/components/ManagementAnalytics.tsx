@@ -14,11 +14,21 @@ import {
 } from 'recharts'
 import { ClipboardList, CheckCircle2, User as UserIcon, Grid } from 'lucide-react'
 
+interface ManagementChartPoint {
+    name: string;
+    value: number;
+}
+
+interface ManagementWorkloadPoint {
+    name: string;
+    count: number;
+}
+
 interface ManagementAnalyticsProps {
-    planStatusData: any[]
-    engagementStatusData: any[]
-    resourceWorkloadData: any[]
-    auditsByFunctionData: any[]
+    planStatusData: ManagementChartPoint[]
+    engagementStatusData: ManagementChartPoint[]
+    resourceWorkloadData: ManagementWorkloadPoint[]
+    auditsByFunctionData: ManagementWorkloadPoint[]
 }
 
 export const ManagementAnalytics: React.FC<ManagementAnalyticsProps> = ({

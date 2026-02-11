@@ -10,13 +10,14 @@ import {
     FileText,
     LogOut
 } from 'lucide-react'
+import type { Session } from '@supabase/supabase-js'
 import type { Profile } from '../types'
 
 interface SidebarProps {
     activeView: string
     setActiveView: (view: string) => void
     profile: Profile | null
-    session: any
+    session: Session | null
     handleLogout: () => Promise<void>
 }
 

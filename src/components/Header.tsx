@@ -1,5 +1,6 @@
 import { Bell, Clock, Sun, Moon } from 'lucide-react'
 import { supabase } from '../supabase'
+import type { Session } from '@supabase/supabase-js'
 import type { Notification } from '../types'
 
 interface HeaderProps {
@@ -9,7 +10,7 @@ interface HeaderProps {
     notifications: Notification[]
     setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>
     markAsRead: (id: string) => void
-    session: any
+    session: Session | null
     theme: 'light' | 'dark'
     toggleTheme: () => void
     children?: React.ReactNode
@@ -62,6 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
     }
 
     const handleMarkAllAsRead = async () => {
+        if (!session?.user?.id) return;
         const { error } = await supabase.from('notifications').update({ is_read: true }).eq('user_id', session.user.id);
         if (!error) setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     }

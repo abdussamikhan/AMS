@@ -1,15 +1,16 @@
 import React from 'react';
 import { ClipboardList, Calendar, Clock, User as UserIcon } from 'lucide-react';
+import type { AuditPlan, AuditEngagement, AuditProgram } from '../../types';
 
 interface AuditPlanningViewProps {
-    auditPlans: any[];
+    auditPlans: AuditPlan[];
     selectedPlanId: string | null;
     setSelectedPlanId: (id: string | null) => void;
-    audits: any[];
+    audits: AuditEngagement[];
     setActiveView: (view: string) => void;
     setSearchQuery: (query: string) => void;
-    createAuditProgram: (auditId: string) => Promise<any>;
-    auditPrograms: any[];
+    createAuditProgram: (auditId: string) => Promise<AuditProgram | undefined>;
+    auditPrograms: AuditProgram[];
 }
 
 export const AuditPlanningView: React.FC<AuditPlanningViewProps> = ({
@@ -70,7 +71,7 @@ export const AuditPlanningView: React.FC<AuditPlanningViewProps> = ({
                                                 {audit.industries?.industry_name} • {audit.functions?.function_name} • {audit.departments?.department_name}
                                             </div>
                                         </div>
-                                        <span className={`badge badge-${audit.status.toLowerCase().replace(' ', '-')}`}>{audit.status}</span>
+                                        <span className={`badge badge-${(audit.status || 'Pending').toLowerCase().replace(' ', '-')}`}>{audit.status || 'Pending'}</span>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

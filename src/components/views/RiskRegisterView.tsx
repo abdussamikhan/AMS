@@ -1,21 +1,24 @@
 import React from 'react';
 import { Search, Plus, Trash2, ShieldAlert } from 'lucide-react';
-import type { RiskRegisterEntry } from '../../types';
+import type { RiskCategory, RiskRegisterEntry } from '../../types';
+import type { NewRiskRegisterEntry } from '../../hooks/useAuditData';
 import { getScoreColor } from '../../utils/uiHelpers';
 
+interface RiskRegisterFilters {
+    search: string;
+    category: string;
+    owner: string;
+    year: string;
+}
+
 interface RiskRegisterViewProps {
-    riskRegisterFilters: {
-        search: string;
-        category: string;
-        owner: string;
-        year: string;
-    };
-    setRiskRegisterFilters: (filters: any) => void;
-    riskCats: any[];
+    riskRegisterFilters: RiskRegisterFilters;
+    setRiskRegisterFilters: React.Dispatch<React.SetStateAction<RiskRegisterFilters>>;
+    riskCats: RiskCategory[];
     riskRegisterEntries: RiskRegisterEntry[];
     setIsEditingRisk: (isEditing: boolean) => void;
     setCurrentRiskId: (id: string | null) => void;
-    setNewRiskEntry: (entry: any) => void;
+    setNewRiskEntry: React.Dispatch<React.SetStateAction<NewRiskRegisterEntry>>;
     setShowNewRiskModal: (show: boolean) => void;
     handleDeleteRisk: (id: string) => Promise<void>;
 }

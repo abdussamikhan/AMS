@@ -45,8 +45,8 @@ export const AdminTemplatesView: React.FC<AdminTemplatesViewProps> = ({
                                             .upload(fileName, file)
                                         if (error) throw error
                                         alert('Template uploaded successfully!')
-                                    } catch (err: any) {
-                                        alert('Error uploading template: ' + err.message)
+                                    } catch (err: unknown) {
+                                        alert('Error uploading template: ' + (err as Error).message)
                                     } finally {
                                         setIsTemplateUploading(false)
                                     }

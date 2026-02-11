@@ -1,21 +1,22 @@
 import React from 'react';
 import { X, Grid, Sparkles, Wand2 } from 'lucide-react';
+import type { Industry, Func, Dept, RiskCategory, System, NewRcmEntry } from '../../types';
 
 interface RcmModalProps {
     showNewRcmModal: boolean;
     setShowNewRcmModal: (show: boolean) => void;
     isEditingRcm: boolean;
-    newRcm: any;
-    setNewRcm: (rcm: any) => void;
+    newRcm: NewRcmEntry;
+    setNewRcm: React.Dispatch<React.SetStateAction<NewRcmEntry>>;
     rcmAiInput: string;
     setRcmAiInput: (input: string) => void;
     isRcmAiProcessing: boolean;
     handleRcmAiGenerate: () => void;
-    industries: any[];
-    allFunctions: any[];
-    allDepartments: any[];
-    riskCats: any[];
-    allSystems: any[];
+    industries: Industry[];
+    allFunctions: Func[];
+    allDepartments: Dept[];
+    riskCats: RiskCategory[];
+    allSystems: System[];
     isCustomFunctionRcm: boolean;
     setIsCustomFunctionRcm: (custom: boolean) => void;
     isCustomDepartmentRcm: boolean;
@@ -188,7 +189,7 @@ export const RcmModal: React.FC<RcmModalProps> = ({
                                 }}
                             >
                                 <option value="">Select Function...</option>
-                                {allFunctions.filter(f => f.is_active !== false).map(f => (
+                                {allFunctions.filter(f => (f as { is_active?: boolean }).is_active !== false).map(f => (
                                     <option key={f.function_id} value={f.function_id}>{f.function_name}</option>
                                 ))}
                                 <option value="custom">+ Other / Custom...</option>
@@ -224,7 +225,7 @@ export const RcmModal: React.FC<RcmModalProps> = ({
                                 }}
                             >
                                 <option value="">Select Department...</option>
-                                {!isCustomFunctionRcm && allDepartments.filter(d => (d.function_id === newRcm.function_id) && d.is_active !== false).map(d => (
+                                {!isCustomFunctionRcm && allDepartments.filter(d => (d.function_id === newRcm.function_id) && (d as { is_active?: boolean }).is_active !== false).map(d => (
                                     <option key={d.department_id} value={d.department_id}>{d.department_name}</option>
                                 ))}
                                 <option value="custom">+ Other / Custom...</option>
@@ -271,7 +272,7 @@ export const RcmModal: React.FC<RcmModalProps> = ({
                                     <select
                                         className="form-control"
                                         value={newRcm.control_type}
-                                        onChange={e => setNewRcm({ ...newRcm, control_type: e.target.value as any })}
+                                        onChange={e => setNewRcm({ ...newRcm, control_type: e.target.value as 'Preventive' | 'Detective' | 'Corrective' })}
                                     >
                                         <option value="Preventive">Preventive</option>
                                         <option value="Detective">Detective</option>
@@ -283,7 +284,7 @@ export const RcmModal: React.FC<RcmModalProps> = ({
                                     <select
                                         className="form-control"
                                         value={newRcm.control_frequency}
-                                        onChange={e => setNewRcm({ ...newRcm, control_frequency: e.target.value as any })}
+                                        onChange={e => setNewRcm({ ...newRcm, control_frequency: e.target.value as 'Continuous' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Annual' })}
                                     >
                                         <option value="Continuous">Continuous</option>
                                         <option value="Daily">Daily</option>
@@ -305,8 +306,8 @@ export const RcmModal: React.FC<RcmModalProps> = ({
                             {isEditingRcm ? 'Update Control' : 'Create Control'}
                         </button>
                     </div>
-                </form>
-            </div>
-        </div>
+                </form >
+            </div >
+        </div >
     );
 };

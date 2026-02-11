@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Wand2, Sparkles, Upload, CheckCircle } from 'lucide-react';
 import { supabase } from '../../supabase';
-import type { Observation, AuditEngagement, AuditProcedure } from '../../types';
+import type { AuditEngagement, AuditProcedure, NewObservation } from '../../types';
 import type { Database } from '../../types/supabase';
 
 interface ObservationModalProps {
@@ -9,8 +9,8 @@ interface ObservationModalProps {
     setShowNewModal: (show: boolean) => void;
     isEditingObs: boolean;
     currentObsId: string | null;
-    newObs: Partial<Observation>;
-    setNewObs: (obs: Partial<Observation>) => void;
+    newObs: NewObservation;
+    setNewObs: React.Dispatch<React.SetStateAction<NewObservation>>;
     aiInput: string;
     setAiInput: (input: string) => void;
     isAIProcessing: boolean;
@@ -22,7 +22,7 @@ interface ObservationModalProps {
     handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
     isUploading: boolean;
     uploadedAttachments: { url: string; title: string }[];
-    setUploadedAttachments: (attachments: { url: string; title: string }[]) => void;
+    setUploadedAttachments: React.Dispatch<React.SetStateAction<{ url: string; title: string }[]>>;
     fetchData: () => void;
 }
 

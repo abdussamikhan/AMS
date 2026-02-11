@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import type { Observation, Profile } from '../types'
+import type { Observation, Profile, RiskRegisterEntry } from '../types'
 
 export const downloadCSV = (filteredObservations: Observation[]) => {
     const headers = ["Condition", "Criteria", "Cause", "Effect", "Recommendation", "Rating", "Framework", "Reference", "Category"]
@@ -29,7 +29,7 @@ export const downloadCSV = (filteredObservations: Observation[]) => {
     document.body.removeChild(link)
 }
 
-export const downloadRiskRegisterCSV = (entries: any[]) => {
+export const downloadRiskRegisterCSV = (entries: RiskRegisterEntry[]) => {
     const headers = ["Risk Title", "Risk Description", "Category", "Owner", "Inherent Score", "Residual Score", "Control Title", "Control Description", "Fiscal Year"]
     const rows = entries.map(entry => [
         `"${(entry.risk_title || "").replace(/"/g, '""')}"`,
@@ -119,7 +119,7 @@ export const generatePDF = (
         }
     })
 
-    const pageCount = (doc as any).internal.getNumberOfPages()
+    const pageCount = doc.getNumberOfPages()
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i)
         doc.setFontSize(8)
@@ -194,7 +194,7 @@ export const generateDetailedPDF = (obs: Observation, profile: Profile | null, u
         }
     })
 
-    const finalY = (doc as any).lastAutoTable.finalY + 15
+    const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15
     doc.setFontSize(14)
     doc.setTextColor(41, 128, 185)
     doc.text('3. MANAGEMENT ACTION PLAN', 14, finalY)
@@ -224,7 +224,7 @@ export const generateDetailedPDF = (obs: Observation, profile: Profile | null, u
         doc.text('Pending management response...', 14, finalY + 10)
     }
 
-    const pageCount = (doc as any).internal.getNumberOfPages()
+    const pageCount = doc.getNumberOfPages()
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i)
         doc.setFontSize(8)
@@ -236,7 +236,7 @@ export const generateDetailedPDF = (obs: Observation, profile: Profile | null, u
 }
 
 export const generateRiskRegisterPDF = (
-    entries: any[], // Using any[] to avoid circular dependency or import issues if RiskRegisterEntry isn't readily available in types
+    entries: RiskRegisterEntry[],
     profile: Profile | null,
     fiscalYear: string,
     userEmail?: string
@@ -285,7 +285,7 @@ export const generateRiskRegisterPDF = (
         }
     })
 
-    const pageCount = (doc as any).internal.getNumberOfPages()
+    const pageCount = doc.getNumberOfPages()
     for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i)
         doc.setFontSize(8)

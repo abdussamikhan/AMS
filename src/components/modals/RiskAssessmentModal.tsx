@@ -1,14 +1,15 @@
 import React from 'react';
 import { X, ShieldAlert } from 'lucide-react';
+import type { RiskCategory, RCMEntry, NewRiskRegisterEntry } from '../../types';
 
 interface RiskAssessmentModalProps {
     showNewRiskModal: boolean;
     setShowNewRiskModal: (show: boolean) => void;
     isEditingRisk: boolean;
-    newRiskEntry: any;
-    setNewRiskEntry: (entry: any) => void;
-    riskCats: any[];
-    rcmEntries: any[];
+    newRiskEntry: NewRiskRegisterEntry;
+    setNewRiskEntry: React.Dispatch<React.SetStateAction<NewRiskRegisterEntry>>;
+    riskCats: RiskCategory[];
+    rcmEntries: RCMEntry[];
     handleSaveRisk: (e: React.FormEvent) => void;
 }
 

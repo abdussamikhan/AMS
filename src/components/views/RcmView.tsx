@@ -1,29 +1,31 @@
 import React from 'react';
 import { Search, Plus, Edit3, Trash2 } from 'lucide-react';
-import type { RCMEntry } from '../../types';
+import type { Industry, Func, Dept, RiskCategory, System, RCMEntry, NewRcmEntry } from '../../types';
+
+interface RcmFilters {
+    search: string;
+    industry: string;
+    function: string;
+    department: string;
+    system: string;
+    category: string;
+    frequency: string;
+}
 
 interface RcmViewProps {
-    rcmFilters: {
-        search: string;
-        industry: string;
-        function: string;
-        department: string;
-        system: string;
-        category: string;
-        frequency: string;
-    };
-    setRcmFilters: (filters: any) => void;
-    industries: any[];
-    allFunctions: any[];
-    allDepartments: any[];
-    allSystems: any[];
-    riskCats: any[];
+    rcmFilters: RcmFilters;
+    setRcmFilters: React.Dispatch<React.SetStateAction<RcmFilters>>;
+    industries: Industry[];
+    allFunctions: Func[];
+    allDepartments: Dept[];
+    allSystems: System[];
+    riskCats: RiskCategory[];
     rcmEntries: RCMEntry[];
     openEditRcmModal: (entry: RCMEntry) => void;
     handleDeleteRcm: (id: string) => Promise<void>;
     setIsEditingRcm: (isEditing: boolean) => void;
     setCurrentRcmId: (id: string | null) => void;
-    setNewRcm: (rcm: any) => void;
+    setNewRcm: React.Dispatch<React.SetStateAction<NewRcmEntry>>;
     setShowNewRcmModal: (show: boolean) => void;
 }
 
@@ -82,7 +84,7 @@ export const RcmView: React.FC<RcmViewProps> = ({
                     onChange={e => setRcmFilters({ ...rcmFilters, function: e.target.value })}
                 >
                     <option value="all">Functions</option>
-                    {allFunctions.filter(f => f.is_active !== false).map(f => <option key={f.function_id} value={f.function_id}>{f.function_name}</option>)}
+                    {allFunctions.filter(f => (f as { is_active?: boolean }).is_active !== false).map(f => <option key={f.function_id} value={f.function_id}>{f.function_name}</option>)}
                 </select>
                 <select
                     className="form-control form-control-sm"
@@ -91,7 +93,7 @@ export const RcmView: React.FC<RcmViewProps> = ({
                 >
                     <option value="all">Departments</option>
                     {allDepartments
-                        .filter(d => (rcmFilters.function === 'all' || !rcmFilters.function || d.function_id === rcmFilters.function) && d.is_active !== false)
+                        .filter(d => (rcmFilters.function === 'all' || !rcmFilters.function || d.function_id === rcmFilters.function) && (d as { is_active?: boolean }).is_active !== false)
                         .map(d => <option key={d.department_id} value={d.department_id}>{d.department_name}</option>)
                     }
                 </select>

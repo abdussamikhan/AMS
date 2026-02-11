@@ -1,11 +1,12 @@
 import React from 'react';
 import { X, Upload } from 'lucide-react';
+import type { ReferenceDocument } from '../../types';
 
 interface ReferenceUploadModalProps {
     showRefUploadModal: boolean;
     setShowRefUploadModal: (show: boolean) => void;
-    newRefDoc: any;
-    setNewRefDoc: (doc: any) => void;
+    newRefDoc: Partial<ReferenceDocument>;
+    setNewRefDoc: (doc: Partial<ReferenceDocument>) => void;
     handleRefUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
     isRefUploading: boolean;
 }

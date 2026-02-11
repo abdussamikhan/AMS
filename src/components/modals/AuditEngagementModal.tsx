@@ -1,16 +1,37 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '../../supabase';
+import type { AuditPlan, Func, Dept, Profile } from '../../types';
 
 interface AuditEngagementModalProps {
     showNewAuditModal: boolean;
     setShowNewAuditModal: (show: boolean) => void;
-    newAudit: any;
-    setNewAudit: (audit: any) => void;
-    auditPlans: any[];
-    allFunctions: any[];
-    allDepartments: any[];
-    auditors: any[];
+    newAudit: {
+        plan_id: string;
+        audit_title: string;
+        assigned_auditor: string;
+        start_date: string;
+        end_date: string;
+        status: string;
+        industry_id: string;
+        function_id: string;
+        department_id: string;
+    };
+    setNewAudit: React.Dispatch<React.SetStateAction<{
+        plan_id: string;
+        audit_title: string;
+        assigned_auditor: string;
+        start_date: string;
+        end_date: string;
+        status: string;
+        industry_id: string;
+        function_id: string;
+        department_id: string;
+    }>>;
+    auditPlans: AuditPlan[];
+    allFunctions: Func[];
+    allDepartments: Dept[];
+    auditors: Profile[];
     isCustomFunctionAudit: boolean;
     setIsCustomFunctionAudit: (custom: boolean) => void;
     isCustomDepartmentAudit: boolean;
@@ -112,8 +133,8 @@ export const AuditEngagementModal: React.FC<AuditEngagementModalProps> = ({
                         setCustomDepartmentAudit('');
                         fetchAuditPlanningData();
                         fetchRcmContext();
-                    } catch (err: any) {
-                        alert(err.message);
+                    } catch (err: unknown) {
+                        alert((err as Error).message);
                     }
                 }} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     <div className="detail-item">
@@ -133,7 +154,7 @@ export const AuditEngagementModal: React.FC<AuditEngagementModalProps> = ({
                             value={newAudit.audit_title}
                             onChange={e => {
                                 const val = e.target.value;
-                                setNewAudit((prev: any) => ({ ...prev, audit_title: val }));
+                                setNewAudit(prev => ({ ...prev, audit_title: val }));
                             }}
                         />
                     </div>

@@ -14,10 +14,20 @@ import {
 } from 'recharts'
 import { BarChart3, Activity, Grid } from 'lucide-react'
 
+interface RcmAnalyticsPoint {
+    name: string;
+    count: number;
+}
+
+interface RcmControlTypePoint {
+    name: string;
+    value: number;
+}
+
 interface RcmAnalyticsProps {
-    rcmCategoryData: any[]
-    rcmControlTypeData: any[]
-    rcmFunctionData: any[]
+    rcmCategoryData: RcmAnalyticsPoint[]
+    rcmControlTypeData: RcmControlTypePoint[]
+    rcmFunctionData: RcmAnalyticsPoint[]
 }
 
 export const RcmAnalytics: React.FC<RcmAnalyticsProps> = ({

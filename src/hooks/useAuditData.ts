@@ -3,13 +3,16 @@ import { supabase } from '../supabase'
 import type { Database } from '../types/supabase'
 import type {
     Observation, Notification, RCMEntry, RiskRegisterEntry, Profile, AuditProgram,
-    Industry, Func, Dept, RiskCategory, System, AuditPlan, AuditEngagement, AuditProcedure, ReferenceDocument
+    Industry, Func, Dept, RiskCategory, System, AuditPlan, AuditEngagement, AuditProcedure, ReferenceDocument,
+    NewRiskRegisterEntry, NewRcmEntry, NewObservation
 } from '../types'
 import { invokeAiProcessRcm, invokeAiProcessAuditFinding } from '../services/aiService'
 import { downloadCSV, generatePDF, generateDetailedPDF, generateRiskRegisterPDF, downloadRiskRegisterCSV } from '../services/exportService'
-import type { Session } from '@supabase/supabase-js'
+import type { Session, SupabaseClient } from '@supabase/supabase-js'
+
 
 export const useAuditData = (session: Session | null) => {
+    const typedSupabase = supabase as unknown as SupabaseClient<Database>
     const [isDataLoading, setIsDataLoading] = useState(false)
     const [observations, setObservations] = useState<Observation[]>([])
     const [procedures, setProcedures] = useState<AuditProcedure[]>([])
@@ -39,7 +42,7 @@ export const useAuditData = (session: Session | null) => {
     const [showNewRiskModal, setShowNewRiskModal] = useState(false)
     const [isEditingRisk, setIsEditingRisk] = useState(false)
     const [currentRiskId, setCurrentRiskId] = useState<string | null>(null)
-    const [newRiskEntry, setNewRiskEntry] = useState<Partial<RiskRegisterEntry>>({
+    const [newRiskEntry, setNewRiskEntry] = useState<NewRiskRegisterEntry>({
         risk_title: '',
         risk_description: '',
         risk_category_id: '',
@@ -50,13 +53,18 @@ export const useAuditData = (session: Session | null) => {
         risk_owner: '',
         audit_frequency: '12 months',
         action_plan: '',
+        status: 'Open',
         fiscal_year: new Date().getFullYear(),
-        rcm_id: null
+        rcm_id: null,
+        control_title: '',
+        control_description: '',
+        target_residual_score: 0,
+        remarks: ''
     })
     const [isRefUploading, setIsRefUploading] = useState(false)
     const [showRefUploadModal, setShowRefUploadModal] = useState(false)
     const [newRefDoc, setNewRefDoc] = useState({ title: '', category: 'Standard' })
-    const [newRcm, setNewRcm] = useState({
+    const [newRcm, setNewRcm] = useState<NewRcmEntry>({
         industry_id: '',
         function_id: '',
         department_id: '',
@@ -68,7 +76,7 @@ export const useAuditData = (session: Session | null) => {
         reference_standard: '',
         control_type: 'Preventive' as Database['public']['Enums']['control_type'],
         control_frequency: 'Continuous' as Database['public']['Enums']['control_frequency'],
-        system_id: ''
+        system_id: null
     })
 
     // Audit Program State
@@ -130,7 +138,7 @@ export const useAuditData = (session: Session | null) => {
     const [currentObsId, setCurrentObsId] = useState<string | null>(null)
 
     // Findings form state
-    const [newObs, setNewObs] = useState<Partial<Observation>>({
+    const [newObs, setNewObs] = useState<NewObservation>({
         procedure_id: '',
         condition: '',
         criteria: '',
@@ -149,7 +157,7 @@ export const useAuditData = (session: Session | null) => {
     // Fetch functions
     const fetchRefDocs = useCallback(async () => {
         try {
-            const { data, error } = await (supabase as any)
+            const { data, error } = await typedSupabase
                 .from('reference_documents')
                 .select('*')
                 .order('created_at', { ascending: false })
@@ -158,7 +166,7 @@ export const useAuditData = (session: Session | null) => {
         } catch (err) {
             console.error('Error fetching reference docs:', err)
         }
-    }, [])
+    }, [typedSupabase])
 
     const fetchAuditPlanningData = useCallback(async () => {
         try {
@@ -190,7 +198,7 @@ export const useAuditData = (session: Session | null) => {
     }, [])
 
     const fetchRcmData = useCallback(async () => {
-        const { data } = await (supabase as any)
+        const { data } = await typedSupabase
             .from('risk_control_matrix')
             .select(`
         *,
@@ -202,12 +210,12 @@ export const useAuditData = (session: Session | null) => {
       `)
             .order('created_at', { ascending: false })
         if (data) setRcmEntries(data as RCMEntry[])
-    }, [])
+    }, [typedSupabase])
 
     const fetchSystems = useCallback(async () => {
-        const { data } = await (supabase as any).from('systems').select('*').eq('is_active', true).order('system_name')
+        const { data } = await typedSupabase.from('systems').select('*').eq('is_active', true).order('system_name')
         if (data) setAllSystems(data)
-    }, [])
+    }, [typedSupabase])
 
     const fetchRcmContext = useCallback(async () => {
         try {
@@ -355,18 +363,22 @@ export const useAuditData = (session: Session | null) => {
         }
     }
 
-    const createAuditProgram = async (auditId: string) => {
+    const createAuditProgram = async (auditId: string): Promise<AuditProgram | undefined> => {
         try {
             const { data, error } = await supabase
                 .from('audit_programs')
                 .insert([{ audit_id: auditId, status: 'Draft' }])
-                .select()
+                .select(`
+                    *,
+                    audits (audit_title)
+                `)
                 .single()
             if (error) throw error
             fetchAuditPrograms()
-            return data
+            return data as unknown as AuditProgram
         } catch (err: unknown) {
             alert('Error creating audit program: ' + (err as Error).message)
+            return undefined
         }
     }
 
@@ -481,7 +493,7 @@ export const useAuditData = (session: Session | null) => {
                     .eq('program_id', programId)
                 if (aptError) throw aptError
 
-                const riskSiblings = allProgramTests.filter((t: any) => (t as any).risk_register?.risk_title === riskTitle)
+                const riskSiblings = allProgramTests.filter(t => t.risk_register?.risk_title === riskTitle)
 
                 // Rule 9 Calculation
                 let riskStatus: 'Mitigated' | 'Partially Mitigated' | 'Not Mitigated' = 'Not Mitigated'
@@ -538,9 +550,9 @@ export const useAuditData = (session: Session | null) => {
                 setObservations(data as unknown as Observation[])
                 const summary = {
                     total: data.length,
-                    critical: data.filter(o => (o as any).risk_rating === 'Critical').length,
-                    high: data.filter(o => (o as any).risk_rating === 'High').length,
-                    medium: data.filter(o => (o as any).risk_rating === 'Medium').length,
+                    critical: data.filter(o => o.risk_rating === 'Critical').length,
+                    high: data.filter(o => o.risk_rating === 'High').length,
+                    medium: data.filter(o => o.risk_rating === 'Medium').length,
                     totalRisks: stats.totalRisks
                 }
                 setStats(summary)
@@ -561,10 +573,10 @@ export const useAuditData = (session: Session | null) => {
             setNewRcm(prev => ({
                 ...prev,
                 risk_title: data.risk_title || '',
-                risk_description: data.risk_description,
+                risk_description: data.risk_description || '',
                 control_title: data.control_title || '',
-                control_description: data.control_description,
-                reference_standard: data.reference_standard
+                control_description: data.control_description || '',
+                reference_standard: data.reference_standard || ''
             }))
             setRcmAiInput('')
         } catch (err: unknown) {
@@ -588,12 +600,12 @@ export const useAuditData = (session: Session | null) => {
                     cause: data.cause || prev.cause,
                     effect: data.effect || prev.effect,
                     recommendation: data.recommendation || prev.recommendation,
-                    risk_rating: (['Low', 'Medium', 'High', 'Critical'].includes(data.risk_rating) ? data.risk_rating : 'Low') as Database['public']['Enums']['risk_level']
+                    risk_rating: (data.risk_rating && ['Low', 'Medium', 'High', 'Critical'].includes(data.risk_rating) ? data.risk_rating : 'Low') as Database['public']['Enums']['risk_level']
                 }))
                 setAiInput('')
                 alert('AI has successfully structured your finding!')
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('AI Error:', err)
             alert('AI Assistant is currently unavailable. Please fill in the details manually.')
         } finally {
@@ -711,10 +723,10 @@ export const useAuditData = (session: Session | null) => {
         e.preventDefault()
         try {
             if (isEditingRisk && currentRiskId) {
-                const { error } = await supabase.from('risk_register' as any).update(newRiskEntry).eq('id', currentRiskId)
+                const { error } = await typedSupabase.from('risk_register').update(newRiskEntry).eq('id', currentRiskId)
                 if (error) throw error
             } else {
-                const { error } = await supabase.from('risk_register' as any).insert([newRiskEntry])
+                const { error } = await typedSupabase.from('risk_register').insert([newRiskEntry])
                 if (error) throw error
             }
             setShowNewRiskModal(false)
@@ -728,7 +740,7 @@ export const useAuditData = (session: Session | null) => {
 
     const handleDeleteRisk = async (id: string) => {
         if (window.confirm('Delete this risk assessment?')) {
-            const { error } = await supabase.from('risk_register' as any).delete().eq('id', id)
+            const { error } = await typedSupabase.from('risk_register').delete().eq('id', id)
             if (error) alert(error.message)
             else fetchRiskRegister()
         }
@@ -750,8 +762,8 @@ export const useAuditData = (session: Session | null) => {
             setIsEditingObs(false)
             setCurrentObsId(null)
             fetchData()
-        } catch (err: any) {
-            alert(err.message)
+        } catch (err: unknown) {
+            alert((err as Error).message)
         } finally {
             setIsSubmitting(false)
         }
@@ -768,7 +780,7 @@ export const useAuditData = (session: Session | null) => {
             if (uploadError) throw uploadError
 
             const { data: urlData } = supabase.storage.from('reference-docs').getPublicUrl(fileName)
-            const { error: dbError } = await (supabase as any).from('reference_documents').insert({
+            const { error: dbError } = await typedSupabase.from('reference_documents').insert({
                 title: newRefDoc.title || file.name,
                 category: newRefDoc.category,
                 file_url: urlData.publicUrl
@@ -777,8 +789,8 @@ export const useAuditData = (session: Session | null) => {
             fetchRefDocs()
             setShowRefUploadModal(false)
             setNewRefDoc({ title: '', category: 'Standard' })
-        } catch (err: any) {
-            alert(err.message)
+        } catch (err: unknown) {
+            alert((err as Error).message)
         } finally {
             setIsRefUploading(false)
         }
@@ -789,11 +801,11 @@ export const useAuditData = (session: Session | null) => {
             try {
                 const fileName = doc.file_url.split('/').pop()
                 if (fileName) await supabase.storage.from('reference-docs').remove([fileName])
-                const { error } = await (supabase as any).from('reference_documents').delete().eq('doc_id', doc.doc_id)
+                const { error } = await typedSupabase.from('reference_documents').delete().eq('doc_id', doc.doc_id)
                 if (error) throw error
                 fetchRefDocs()
-            } catch (err: any) {
-                alert(err.message)
+            } catch (err: unknown) {
+                alert((err as Error).message)
             }
         }
     }
@@ -813,8 +825,8 @@ export const useAuditData = (session: Session | null) => {
                 setUploadedAttachments(prev => [...prev, { url: publicUrl, title: attachmentTitle || file.name }])
             }
             setAttachmentTitle('')
-        } catch (err: any) {
-            alert('Error uploading file: ' + err.message)
+        } catch (err: unknown) {
+            alert('Error uploading file: ' + (err as Error).message)
         } finally {
             setIsUploading(false)
         }

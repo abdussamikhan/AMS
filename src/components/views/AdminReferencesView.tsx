@@ -1,13 +1,18 @@
 import React from 'react';
 import { Search, Plus, Database as DatabaseIcon, FileText, Download, Trash2 } from 'lucide-react';
-import type { Profile } from '../../types';
+import type { ReferenceDocument, Profile } from '../../types';
+
+interface ReferenceFilters {
+    search: string;
+    category: string;
+}
 
 interface AdminReferencesViewProps {
-    refDocs: any[];
-    refFilters: { search: string, category: string };
-    setRefFilters: (filters: any) => void;
+    refDocs: ReferenceDocument[];
+    refFilters: ReferenceFilters;
+    setRefFilters: (filters: ReferenceFilters) => void;
     setShowRefUploadModal: (show: boolean) => void;
-    handleDeleteRef: (doc: any) => void;
+    handleDeleteRef: (doc: ReferenceDocument) => void;
     profile: Profile | null;
 }
 
@@ -89,7 +94,7 @@ export const AdminReferencesView: React.FC<AdminReferencesViewProps> = ({
                                 return matchesSearch && matchesCategory
                             })
                             .map((doc, idx) => (
-                                <div key={doc.id || idx} className="doc-card" style={{ background: 'var(--card-bg)', borderRadius: '1rem', border: '1px solid var(--border-color)', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <div key={doc.doc_id || idx} className="doc-card" style={{ background: 'var(--card-bg)', borderRadius: '1rem', border: '1px solid var(--border-color)', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                         <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '0.5rem', borderRadius: '0.5rem' }}>
                                             <FileText size={20} color="var(--accent-blue)" />
